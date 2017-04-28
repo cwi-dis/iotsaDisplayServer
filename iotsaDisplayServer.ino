@@ -55,7 +55,7 @@ unsigned long alarmEndTime;
 #ifdef WITH_LCD
 // Includes and defines for liquid crystal server
 #define PIN_SDA 4     // GPIO4 is SDA for liquid crystal I2C addon board
-#define PIN_SCL 2     // GPIO2 is SDA for liquid crystal I2C addon board
+#define PIN_SCL 2     // GPIO2 is SCL for liquid crystal I2C addon board
 #define LCD_WIDTH 20  // Number of characters per line on LCD
 #define LCD_HEIGHT 4  // Number of lines on LCD
 
