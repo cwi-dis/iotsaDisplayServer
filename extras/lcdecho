@@ -1,0 +1,78 @@
+#!/usr/bin/python
+#
+# Show a message on an LCD display server (an ESP8266 running DisplayServer)
+#
+import argparse
+import urllib
+import sys
+import urlparse
+import socket
+
+DEFAULT_SERVER="lcd.local"
+
+def showMessage(message='', x=None, y=None, clear=False, backlight=0, alarm=0, server=DEFAULT_SERVER):
+	if clear:
+		if x is None: x = 0
+		if y is None: y = 0
+	args = {'msg':message}
+	if backlight: args['backlight'] = backlight
+	if alarm: args['alarm'] = alarm
+	if x != None: args['x'] = x
+	if y != None: args['y'] = y
+	if clear: args['clear'] = 1
+	query = urllib.urlencode(args)
+	url = "http://%s/display?%s" % (server, query)
+	f = urllib.urlopen(url)
+	while f.read():
+		pass
+
+def expandMDNS(url):
+	"""Expand MDNS hotsnames, leave everything else intact"""
+	scheme, netloc, path, params, query, fragment = urlparse.urlparse(url)
+	port = None
+	if ':' in netloc:
+		netloc, port = netloc.split(':')
+	if netloc[-6:] == ".local":
+		netloc = socket.gethostbyname(netloc)
+	if port:
+		netloc = netloc + ':' + port
+	return urlparse.urlunparse((scheme, netloc, path, params, query, fragment))
+	
+def programButtons(button1=None, button2=None, server=DEFAULT_SERVER):
+	args = {}
+	if button1 != None: args['button1url'] = expandMDNS(button1)
+	if button2 != None: args['button2url'] = expandMDNS(button2)
+	query = urllib.urlencode(args)
+	url = "http://%s/buttons?%s" % (server, query)
+	f = urllib.urlopen(url)
+	while f.read():
+		pass
+
+def main():
+	parser = argparse.ArgumentParser()
+	parser.add_argument("message", nargs='*', help="The message to display")
+	#parser.add_argument("-n", "--nonewline", help="Do not add a newline to the message", action="store_true")
+	parser.add_argument("-c", "--clear", help="Clear screen before showing message", action="store_true")
+	parser.add_argument("-b", "--backlight", metavar="N", help="Turn on backlight for N seconds", type=int, default=0)
+	parser.add_argument("-a", "--alarm", metavar="N", help="Turn on beeper for N/10 seconds", type=int, default=0)
+	parser.add_argument("-x", "--x", metavar="X", help="Set X position before showing message", type=int)
+	parser.add_argument("-y", "--y", metavar="Y", help="Set Y position before showing message", type=int)
+	parser.add_argument("-s", "--server", metavar="HOST", help="Send message to server HOST (default: %s)" % DEFAULT_SERVER, default=DEFAULT_SERVER)
+	parser.add_argument("-1", "--button1url", metavar="URL", help="Program button 1 to contact URL")
+	parser.add_argument("-2", "--button2url", metavar="URL", help="Program button 2 to contact URL")
+	args = parser.parse_args(sys.argv[1:])
+	if args.message:
+		message = ' '.join(args.message)
+	else:
+		message = ''
+	#if not args.nonewline: message += '\n'
+	if message or args.x or args.y or args.clear or args.backlight or args.alarm:
+		showMessage(message, x=args.x, y=args.y, clear=args.clear, backlight=args.backlight, alarm=args.alarm, server=args.server)
+	if args.button1url or args.button2url:
+		programButtons(button1=args.button1url, button2=args.button2url, server=args.server)
+	
+	
+if __name__ == '__main__':
+	main()
+	
+	
