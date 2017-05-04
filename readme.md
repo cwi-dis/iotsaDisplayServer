@@ -3,6 +3,7 @@
 iotsaDisplayServer is a web server that drives an LCD display, such as an i2c 4x20 character module. Support for a buzzer (to attract user attention) and buttons (programmable to trigger actions by accessing programmable URLs) is included.
 
 Home page is <https://github.com/cwi-dis/iotsaDisplayServer>.
+This software is licensed under the [MIT license](LICENSE.txt) by the   CWI DIS group, <http://www.dis.cwi.nl>.
 
 ## Software requirements
 
