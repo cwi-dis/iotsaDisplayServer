@@ -22,7 +22,7 @@
 #include "iotsaSimple.h"
 #include "iotsaConfigFile.h"
 
-#undef WITH_OTA // Define if you have an ESP12E or other board with enough Flash memory to allow OTA updates
+#define WITH_OTA // Define if you have an ESP12E or other board with enough Flash memory to allow OTA updates
 
 #define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (undefine for no buzzer)
 #define WITH_LCD       // Enable support for LCD, undefine to disable
@@ -213,14 +213,15 @@ IotsaSimpleMod displayMod(application, "/display", lcdHandler, lcdInfo);
 typedef struct _Button {
   int pin;
   String url;
+  String fingerprint;
   int debounceState;
   int debounceTime;
   bool buttonState;
 } Button;
 
 Button buttons[] = {
-  { 13, "", 0, 0, false},
-  { 12, "", 0, 0, false}
+  { 13, "", "", 0, 0, false},
+  { 12, "", "", 0, 0, false}
 };
 
 const int nButton = sizeof(buttons) / sizeof(buttons[0]);
@@ -233,6 +234,8 @@ void buttonConfigLoad() {
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1) + "url";
     cf.get(name, buttons[i].url, "");
+    name = "button" + String(i+1) + "fingerprint";
+    cf.get(name, buttons[i].fingerprint, "");
   }
 }
 
@@ -241,6 +244,8 @@ void buttonConfigSave() {
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1) + "url";
     cf.put(name, buttons[i].url);
+    name = "button" + String(i+1) + "fingerprint";
+    cf.put(name, buttons[i].fingerprint);
   }
 }
 
@@ -266,6 +271,15 @@ void buttonHandler() {
         IFDEBUG IotsaSerial.println(buttons[j].url);
         any = true;
       }
+      wtdName = "button" + String(j+1) + "fingerprint";
+      if (server.argName(i) == wtdName) {
+        String arg = server.arg(i);
+        decodePercentEscape(arg, &buttons[j].fingerprint);
+        IFDEBUG IotsaSerial.print(wtdName);
+        IFDEBUG IotsaSerial.print("=");
+        IFDEBUG IotsaSerial.println(buttons[j].fingerprint);
+        any = true;
+      }
     }
     if (server.argName(i) == "format" && server.arg(i) == "json") {
       isJSON = true;
@@ -289,6 +303,13 @@ void buttonHandler() {
       message += "url\" : \"";
       message += buttons[i].url;
       message += "\"";
+      if (buttons[i].fingerprint != "") {
+        message += ", \"button";
+        message += String(i+1);
+        message += "fingerprint\" : \"";
+        message += buttons[i].fingerprint;
+        message += "\"";
+      }
     }
     message += "\"}\n";
     server.send(200, "application/json", message);
@@ -304,6 +325,9 @@ void buttonHandler() {
       message += "Button " + String(i+1) + " activation URL: <input name='button" + String(i+1) + "url' value='";
       message += buttons[i].url;
       message += "'><br>\n";
+      message += "Button " + String(i+1) + " fingerprint (https-only): <input name='button" + String(i+1) + "fingerprint' value='";
+      message += buttons[i].fingerprint;
+      message += "'><br>\n";
     }
     message += "<input type='submit'></form></body></html>";
     server.send(200, "text/html", message);
@@ -314,22 +338,30 @@ String buttonInfo() {
   return "<p>See <a href='/buttons'>/buttons</a> to program URLs for button presses.</a>";
 }
 
-bool sendRequest(String urlStr) {
+bool sendRequest(String& urlStr, String& fingerprint) {
   bool rv = true;
   HTTPClient http;
 
-  http.begin(urlStr);
+  if (urlStr.startsWith("https:")) {
+    http.begin(urlStr, fingerprint);
+  } else {
+    http.begin(urlStr);
+  }
   int code = http.GET();
-  if (code > 0) {
+  if (code >= 200 && code < 300) {
     IFDEBUG IotsaSerial.print("OK GET ");
+    IFDEBUG IotsaSerial.print(code);
+    IFDEBUG IotsaSerial.print(" ");
     IFDEBUG IotsaSerial.println(urlStr);
- #ifdef PIN_ALARM
+#ifdef PIN_ALARM
     alarmEndTime = millis() + BUTTON_BEEP_DUR;
     pinMode(PIN_ALARM, OUTPUT);
     digitalWrite(PIN_ALARM, LOW);
 #endif // PIN_ALARM
   } else {
     IFDEBUG IotsaSerial.print("FAIL GET ");
+    IFDEBUG IotsaSerial.print(code);
+    IFDEBUG IotsaSerial.print(" ");
     IFDEBUG IotsaSerial.println(urlStr);
   }
   http.end();
@@ -347,7 +379,7 @@ void buttonLoop() {
       int newButtonState = (state == LOW);
       if (newButtonState != buttons[i].buttonState) {
         buttons[i].buttonState = newButtonState;
-        if (buttons[i].buttonState && buttons[i].url != "") sendRequest(buttons[i].url);
+        if (buttons[i].buttonState && buttons[i].url != "") sendRequest(buttons[i].url, buttons[i].fingerprint);
       }
     }
   }
