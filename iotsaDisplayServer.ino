@@ -22,10 +22,10 @@
 #include "iotsaSimple.h"
 #include "iotsaConfigFile.h"
 
-#undef WITH_OTA // Define if you have an ESP12E or other board with enough Flash memory to allow OTA updates
+#define WITH_OTA // Define if you have an ESP12E or other board with enough Flash memory to allow OTA updates
 
-#define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (undefine for no buzzer)
-#define WITH_LCD       // Enable support for LCD, undefine to disable
+#undef PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (undefine for no buzzer)
+#undef WITH_LCD       // Enable support for LCD, undefine to disable
 #define WITH_BUTTONS  // Enable support for buttons, undefine to disable
 
 #define IFDEBUGX if(0)
@@ -321,7 +321,8 @@ bool sendRequest(String urlStr) {
   http.begin(urlStr);
   int code = http.GET();
   if (code > 0) {
-    IFDEBUG IotsaSerial.print("OK GET ");
+    IFDEBUG IotsaSerial.print(code);
+    IFDEBUG IotsaSerial.print(" OK GET ");
     IFDEBUG IotsaSerial.println(urlStr);
  #ifdef PIN_ALARM
     alarmEndTime = millis() + BUTTON_BEEP_DUR;
@@ -329,7 +330,8 @@ bool sendRequest(String urlStr) {
     digitalWrite(PIN_ALARM, LOW);
 #endif // PIN_ALARM
   } else {
-    IFDEBUG IotsaSerial.print("FAIL GET ");
+    IFDEBUG IotsaSerial.print(code);
+    IFDEBUG IotsaSerial.print(" FAIL GET ");
     IFDEBUG IotsaSerial.println(urlStr);
   }
   http.end();
