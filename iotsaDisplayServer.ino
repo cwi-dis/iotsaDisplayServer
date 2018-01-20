@@ -27,6 +27,7 @@
 #undef PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (undefine for no buzzer)
 #undef WITH_LCD       // Enable support for LCD, undefine to disable
 #define WITH_BUTTONS  // Enable support for buttons, undefine to disable
+#undef WITH_CREDENTIALS
 
 #define IFDEBUGX if(0)
 
@@ -213,14 +214,17 @@ IotsaSimpleMod displayMod(application, "/display", lcdHandler, lcdInfo);
 typedef struct _Button {
   int pin;
   String url;
+  String fingerprint;
+  String credentials;
+  String token;
   int debounceState;
   int debounceTime;
   bool buttonState;
 } Button;
 
 Button buttons[] = {
-  { 13, "", 0, 0, false},
-  { 12, "", 0, 0, false}
+  { 13, "", "", "", "", 0, 0, false},
+  { 12, "", "", "", "", 0, 0, false}
 };
 
 const int nButton = sizeof(buttons) / sizeof(buttons[0]);
@@ -233,6 +237,14 @@ void buttonConfigLoad() {
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1) + "url";
     cf.get(name, buttons[i].url, "");
+    name = "button" + String(i+1) + "fingerprint";
+    cf.get(name, buttons[i].fingerprint, "");
+#ifdef WITH_CREDENTIALS
+    name = "button" + String(i+1) + "credentials";
+    cf.get(name, buttons[i].credentials, "");
+#endif
+    name = "button" + String(i+1) + "token";
+    cf.get(name, buttons[i].token, "");
   }
 }
 
@@ -241,6 +253,14 @@ void buttonConfigSave() {
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1) + "url";
     cf.put(name, buttons[i].url);
+    name = "button" + String(i+1) + "fingerprint";
+    cf.put(name, buttons[i].fingerprint);
+#ifdef WITH_CREDENTIALS
+    name = "button" + String(i+1) + "credentials";
+    cf.put(name, buttons[i].credentials);
+#endif
+    name = "button" + String(i+1) + "token";
+    cf.put(name, buttons[i].token);
   }
 }
 
@@ -266,6 +286,35 @@ void buttonHandler() {
         IFDEBUG IotsaSerial.println(buttons[j].url);
         any = true;
       }
+      wtdName = "button" + String(j+1) + "fingerprint";
+      if (server.argName(i) == wtdName) {
+        String arg = server.arg(i);
+        decodePercentEscape(arg, &buttons[j].fingerprint);
+        IFDEBUG IotsaSerial.print(wtdName);
+        IFDEBUG IotsaSerial.print("=");
+        IFDEBUG IotsaSerial.println(buttons[j].fingerprint);
+        any = true;
+      }
+#ifdef WITH_CREDENTIALS
+      wtdName = "button" + String(j+1) + "credentials";
+      if (server.argName(i) == wtdName) {
+        String arg = server.arg(i);
+        decodePercentEscape(arg, &buttons[j].credentials);
+        IFDEBUG IotsaSerial.print(wtdName);
+        IFDEBUG IotsaSerial.print("=");
+        IFDEBUG IotsaSerial.println(buttons[j].credentials);
+        any = true;
+      }
+#endif
+      wtdName = "button" + String(j+1) + "token";
+      if (server.argName(i) == wtdName) {
+        String arg = server.arg(i);
+        decodePercentEscape(arg, &buttons[j].token);
+        IFDEBUG IotsaSerial.print(wtdName);
+        IFDEBUG IotsaSerial.print("=");
+        IFDEBUG IotsaSerial.println(buttons[j].token);
+        any = true;
+      }
     }
     if (server.argName(i) == "format" && server.arg(i) == "json") {
       isJSON = true;
@@ -289,6 +338,27 @@ void buttonHandler() {
       message += "url\" : \"";
       message += buttons[i].url;
       message += "\"";
+
+      message += ", \"button";
+      message += String(i+1);
+      message += "fingerprint\" : \"";
+      message += buttons[i].fingerprint;
+      message += "\"";
+
+#ifdef WITH_CREDENTIALS
+      message += ", \"button";
+      message += String(i+1);
+      message += "credentials\" : \"";
+      message += buttons[i].credentials;
+      message += "\"";
+#endif
+
+      message += ", \"button";
+      message += String(i+1);
+      message += "token\" : \"";
+      message += buttons[i].token;
+      message += "\"";
+
     }
     message += "\"}\n";
     server.send(200, "application/json", message);
@@ -301,9 +371,25 @@ void buttonHandler() {
     }
     message += "<form method='get'>";
     for (int i=0; i<nButton; i++) {
-      message += "Button " + String(i+1) + " activation URL: <input name='button" + String(i+1) + "url' value='";
+      message += "<em>Button " + String(i+1) + "</em><br>\n";
+      message += "Activation URL: <input name='button" + String(i+1) + "url' value='";
       message += buttons[i].url;
       message += "'><br>\n";
+
+      message += "Fingerprint <i>(https only)</i>: <input name='button" + String(i+1) + "fingerprint' value='";
+      message += buttons[i].fingerprint;
+      message += "'><br>\n";
+
+      message += "Bearer token <i>(optional)</i>: <input name='button" + String(i+1) + "token' value='";
+      message += buttons[i].token;
+      message += "'><br>\n";
+
+#ifdef WITH_CREDENTIALS
+      message += "Credentials <i>(optional, user:pass)</i>: <input name='button" + String(i+1) + "credentials' value='";
+      message += buttons[i].credentials;
+      message += "'><br>\n";
+#endif
+
     }
     message += "<input type='submit'></form></body></html>";
     server.send(200, "text/html", message);
@@ -314,13 +400,27 @@ String buttonInfo() {
   return "<p>See <a href='/buttons'>/buttons</a> to program URLs for button presses.</a>";
 }
 
-bool sendRequest(String urlStr) {
+bool sendRequest(String urlStr, String token, String credentials, String fingerprint) {
   bool rv = true;
   HTTPClient http;
 
-  http.begin(urlStr);
+  if (urlStr.startsWith("https:")) {
+    http.begin(urlStr, fingerprint);
+  } else {
+    http.begin(urlStr);  
+  }
+  if (token != "") {
+    http.addHeader("Authorization", "Bearer " + token);
+  }
+
+#ifdef WITH_CREDENTIALS
+  if (credentials != "") {
+  	String cred64 = b64encode(credentials);
+    http.addHeader("Authorization", "Bearer " + cred64);
+  }
+#endif
   int code = http.GET();
-  if (code > 0) {
+  if (code >= 200 && code <= 299) {
     IFDEBUG IotsaSerial.print(code);
     IFDEBUG IotsaSerial.print(" OK GET ");
     IFDEBUG IotsaSerial.println(urlStr);
@@ -349,11 +449,12 @@ void buttonLoop() {
       int newButtonState = (state == LOW);
       if (newButtonState != buttons[i].buttonState) {
         buttons[i].buttonState = newButtonState;
-        if (buttons[i].buttonState && buttons[i].url != "") sendRequest(buttons[i].url);
+        if (buttons[i].buttonState && buttons[i].url != "") {
+        	sendRequest(buttons[i].url, buttons[i].token, buttons[i].credentials, buttons[i].fingerprint);
+        }
       }
     }
   }
-
 }
 
 IotsaSimpleMod buttonMod(application, "/buttons", buttonHandler, buttonInfo);
