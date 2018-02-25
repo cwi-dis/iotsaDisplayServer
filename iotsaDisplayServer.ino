@@ -24,9 +24,15 @@
 
 #define WITH_OTA // Define if you have an ESP12E or other board with enough Flash memory to allow OTA updates
 
-#undef PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (undefine for no buzzer)
-#undef WITH_LCD       // Enable support for LCD, undefine to disable
+#define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (undefine for no buzzer)
+#define WITH_LCD       // Enable support for LCD, undefine to disable
+#define LCD_WIDTH 20  // Number of characters per line on LCD
+#define LCD_HEIGHT 4  // Number of lines on LCD
+#define PIN_SDA 5
+#define PIN_SCL 4
 #define WITH_BUTTONS  // Enable support for buttons, undefine to disable
+#define PIN_BUTTON_1 13
+#define PIN_BUTTON_2 12
 #undef WITH_CREDENTIALS
 
 #define IFDEBUGX if(0)
@@ -55,10 +61,6 @@ unsigned long alarmEndTime;
 //
 #ifdef WITH_LCD
 // Includes and defines for liquid crystal server
-#define PIN_SDA 4     // GPIO4 is SDA for liquid crystal I2C addon board
-#define PIN_SCL 2     // GPIO2 is SCL for liquid crystal I2C addon board
-#define LCD_WIDTH 20  // Number of characters per line on LCD
-#define LCD_HEIGHT 4  // Number of lines on LCD
 
 #include <Wire.h>
 // The LiquidCrystal library needed is from
@@ -223,8 +225,8 @@ typedef struct _Button {
 } Button;
 
 Button buttons[] = {
-  { 13, "", "", "", "", 0, 0, false},
-  { 12, "", "", "", "", 0, 0, false}
+  { PIN_BUTTON_1, "", "", "", "", 0, 0, false},
+  { PIN_BUTTON_2, "", "", "", "", 0, 0, false}
 };
 
 const int nButton = sizeof(buttons) / sizeof(buttons[0]);
