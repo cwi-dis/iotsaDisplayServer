@@ -72,8 +72,19 @@ unsigned long alarmEndTime;
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 unsigned long clearTime;  // time at which to turn off backlight
 
+class IotsaDisplayMod : IotsaMod {
+public:
+  IotsaDisplayMod(IotsaApplication &_app) : IotsaMod(_app) {}
+  void setup();
+  void serverSetup();
+  void loop();
+  String info();
+private:
+  void handler();
+};
+
 // LCD handlers
-void lcdSetup() {
+void IotsaDisplayMod::setup() {
   IFDEBUG IotsaSerial.print("lcdSetup");
   Wire.begin(PIN_SDA, PIN_SCL);
   lcd.begin(LCD_WIDTH, LCD_HEIGHT);
@@ -91,7 +102,7 @@ void lcdSetup() {
 int x=0;
 int y=0;
 
-void lcdHandler() {
+void IotsaDisplayMod::handler() {
   String msg;
   bool any = false;
   bool didBacklight = false;
@@ -186,11 +197,11 @@ void lcdHandler() {
   
 }
 
-String lcdInfo() {
+String IotsaDisplayMod::info() {
   return "<p>See <a href='/display'>/display</a> to display messages.";
 }
 
-void lcdLoop() {
+void IotsaDisplayMod::loop() {
   if (clearTime && millis() > clearTime) {
     clearTime = 0;
     lcd.noBacklight();
@@ -204,8 +215,11 @@ void lcdLoop() {
 #endif
 }
 
-IotsaSimpleMod displayMod(application, "/display", lcdHandler, lcdInfo);
+void IotsaDisplayMod::serverSetup() {
+  server.on("/display", std::bind(&IotsaDisplayMod::handler, this));
+}
 
+IotsaDisplayMod displayMod(application);
 #endif // WITH_LCD
 
 //
@@ -234,7 +248,21 @@ const int nButton = sizeof(buttons) / sizeof(buttons[0]);
 #define DEBOUNCE_DELAY 50 // 50 ms debouncing
 #define BUTTON_BEEP_DUR 10  // 10ms beep for button press
 
-void buttonConfigLoad() {
+class IotsaButtonMod : IotsaMod {
+public:
+  IotsaButtonMod(IotsaApplication &_app) : IotsaMod(_app) {}
+  void setup();
+  void serverSetup();
+  void loop();
+  String info();
+private:
+  void configLoad();
+  void configSave();
+  void handler();
+};
+
+
+void IotsaButtonMod::configLoad() {
   IotsaConfigFileLoad cf("/config/buttons.cfg");
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1) + "url";
@@ -250,7 +278,7 @@ void buttonConfigLoad() {
   }
 }
 
-void buttonConfigSave() {
+void IotsaButtonMod::configSave() {
   IotsaConfigFileSave cf("/config/buttons.cfg");
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1) + "url";
@@ -266,14 +294,14 @@ void buttonConfigSave() {
   }
 }
 
-void buttonSetup() {
+void IotsaButtonMod::setup() {
   for (int i=0; i<nButton; i++) {
     pinMode(buttons[i].pin, INPUT_PULLUP);
   }
-  buttonConfigLoad();
+  configLoad();
 }
 
-void buttonHandler() {
+void IotsaButtonMod::handler() {
   bool any = false;
   bool isJSON = false;
 
@@ -322,7 +350,7 @@ void buttonHandler() {
       isJSON = true;
     }
   }
-  if (any) buttonConfigSave();
+  if (any) configSave();
   if (isJSON) {
     String message = "{\"buttons\" : [";
     for (int i=0; i<nButton; i++) {
@@ -398,7 +426,7 @@ void buttonHandler() {
   }
 }
 
-String buttonInfo() {
+String IotsaButtonMod::info() {
   return "<p>See <a href='/buttons'>/buttons</a> to program URLs for button presses.</a>";
 }
 
@@ -440,7 +468,7 @@ bool sendRequest(String urlStr, String token, String credentials, String fingerp
   return rv;
 }
 
-void buttonLoop() {
+void IotsaButtonMod::loop() {
   for (int i=0; i<nButton; i++) {
     int state = digitalRead(buttons[i].pin);
     if (state != buttons[i].debounceState) {
@@ -459,8 +487,11 @@ void buttonLoop() {
   }
 }
 
-IotsaSimpleMod buttonMod(application, "/buttons", buttonHandler, buttonInfo);
+void IotsaButtonMod::serverSetup() {
+  server.on("/buttons", std::bind(&IotsaButtonMod::handler, this));
+}
 
+IotsaButtonMod buttonMod(application);
 #endif // WITH_BUTTON
 
 //
@@ -510,21 +541,9 @@ static void decodePercentEscape(String &src, String *dst) {
 void setup(void) {
   application.setup();
   application.serverSetup();
-#ifdef WITH_LCD
-  lcdSetup();
-#endif
-#ifdef WITH_BUTTONS
-  buttonSetup();
-#endif
   ESP.wdtEnable(WDTO_120MS);
 }
  
 void loop(void) {
   application.loop();
-#ifdef WITH_LCD
-  lcdLoop();
-#endif
-#ifdef WITH_BUTTONS
-  buttonLoop();
-#endif
 } 
