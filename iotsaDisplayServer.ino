@@ -72,13 +72,15 @@ unsigned long alarmEndTime;
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 unsigned long clearTime;  // time at which to turn off backlight
 
-class IotsaDisplayMod : IotsaMod {
+class IotsaDisplayMod : IotsaApiMod {
 public:
-  IotsaDisplayMod(IotsaApplication &_app) : IotsaMod(_app) {}
+  IotsaDisplayMod(IotsaApplication &_app) : IotsaApiMod(_app) {}
   void setup();
   void serverSetup();
   void loop();
   String info();
+protected:
+  bool postHandler(const char *path, const JsonVariant& request, JsonObject& reply);
 private:
   void handler();
 };
@@ -197,6 +199,59 @@ void IotsaDisplayMod::handler() {
   
 }
 
+bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+  bool any = false;
+  if (!request.is<JsonObject>()) return false;
+  JsonObject& reqObj = request.as<JsonObject>();
+  if (reqObj.get<bool>("clear")) {
+    any = true;
+    lcd.clear();
+  }
+  if (reqObj.containsKey("x") || reqObj.containsKey("y")) {
+    x = reqObj.get<int>("x");
+    y = reqObj.get<int>("y");
+    lcd.setCursor(x, y);
+    any = true;
+  }
+#ifdef PIN_ALARM
+  int alarm = reqObj.get<int>("alarm");
+  if (alarm) {
+    any = true;
+    alarmEndTime = millis() + alarm*100;
+    IotsaSerial.println("alarm on");
+    pinMode(PIN_ALARM, OUTPUT);
+    digitalWrite(PIN_ALARM, LOW);
+    
+  }
+#endif // PIN_ALARM
+  int backlight = 5000;
+  if (reqObj.containsKey("backlight")) {
+    backlight = int(reqObj.get<float>("backlight") * 1000);
+  }
+  if (backlight) {
+    clearTime = millis() + backlight;
+    lcd.backlight();
+  } else {
+    lcd.noBacklight();
+  }
+  String msg = reqObj.get<String>("msg");
+  if (msg != "") {
+    any = true;
+    for (int i=0; i<msg.length(); i++) {
+      char newch = msg.charAt(i);
+      lcd.print(newch);
+      x++;
+      if (x >= LCD_WIDTH) {
+        x = 0;
+        y++;
+        if (y >= LCD_HEIGHT) y = 0;
+        lcd.setCursor(x, y);
+      }
+    }
+  }
+  return any;
+}
+
 String IotsaDisplayMod::info() {
   return "<p>See <a href='/display'>/display</a> to display messages.";
 }
@@ -217,6 +272,7 @@ void IotsaDisplayMod::loop() {
 
 void IotsaDisplayMod::serverSetup() {
   server.on("/display", std::bind(&IotsaDisplayMod::handler, this));
+  api.setup("/api/display", false, false, true);
 }
 
 IotsaDisplayMod displayMod(application);
@@ -248,14 +304,16 @@ const int nButton = sizeof(buttons) / sizeof(buttons[0]);
 #define DEBOUNCE_DELAY 50 // 50 ms debouncing
 #define BUTTON_BEEP_DUR 10  // 10ms beep for button press
 
-class IotsaButtonMod : IotsaMod {
+class IotsaButtonMod : IotsaApiMod {
 public:
-  IotsaButtonMod(IotsaApplication &_app) : IotsaMod(_app) {}
+  IotsaButtonMod(IotsaApplication &_app) : IotsaApiMod(_app) {}
   void setup();
   void serverSetup();
   void loop();
   String info();
-private:
+protected:
+  bool getHandler(const char *path, JsonObject& reply);
+  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply);
   void configLoad();
   void configSave();
   void handler();
@@ -487,8 +545,56 @@ void IotsaButtonMod::loop() {
   }
 }
 
+bool IotsaButtonMod::getHandler(const char *path, JsonObject& reply) {
+  JsonArray& rv = reply.createNestedArray("buttons");
+  for (Button *b=buttons; b<buttons+nButton; b++) {
+    JsonObject& bRv = rv.createNestedObject();
+    bRv["url"] = b->url;
+    bRv["fingerprint"] = b->fingerprint;
+    bRv["state"] = b->buttonState;
+    bRv["hasCredentials"] = b->credentials != "";
+    bRv["hasToken"] = b->token != "";
+  }
+  return true;
+}
+
+bool IotsaButtonMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+  Button *b;
+  if (strcmp(path, "/api/buttons/0") == 0) {
+    b = &buttons[0];
+  } else if (strcmp(path, "/api/buttons/1") == 0) {
+    b = &buttons[1];
+  } else {
+    return false;
+  }
+  if (!request.is<JsonObject>()) return false;
+  JsonObject& reqObj = request.as<JsonObject>();
+  bool any = false;
+  if (reqObj.containsKey("url")) {
+    any = true;
+    b->url = reqObj.get<String>("url");
+  }
+  if (reqObj.containsKey("fingerprint")) {
+    any = true;
+    b->fingerprint = reqObj.get<String>("fingerprint");
+  }
+  if (reqObj.containsKey("credentials")) {
+    any = true;
+    b->credentials = reqObj.get<String>("credentials");
+  }
+  if (reqObj.containsKey("token")) {
+    any = true;
+    b->token = reqObj.get<String>("token");
+  }
+  if (any) configSave();
+  return any;
+}
+
 void IotsaButtonMod::serverSetup() {
   server.on("/buttons", std::bind(&IotsaButtonMod::handler, this));
+  api.setup("/api/buttons", true, false);
+  api.setup("/api/buttons/0", false, true);
+  api.setup("/api/buttons/1", false, true);
 }
 
 IotsaButtonMod buttonMod(application);
