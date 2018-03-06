@@ -26,7 +26,14 @@
 
 #define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (undefine for no buzzer)
 #define WITH_LCD       // Enable support for LCD, undefine to disable
+#define LCD_WIDTH 20  // Number of characters per line on LCD
+#define LCD_HEIGHT 4  // Number of lines on LCD
+#define PIN_SDA 5
+#define PIN_SCL 4
 #define WITH_BUTTONS  // Enable support for buttons, undefine to disable
+#define PIN_BUTTON_1 13
+#define PIN_BUTTON_2 12
+#undef WITH_CREDENTIALS
 
 #define IFDEBUGX if(0)
 
@@ -54,10 +61,6 @@ unsigned long alarmEndTime;
 //
 #ifdef WITH_LCD
 // Includes and defines for liquid crystal server
-#define PIN_SDA 4     // GPIO4 is SDA for liquid crystal I2C addon board
-#define PIN_SCL 2     // GPIO2 is SCL for liquid crystal I2C addon board
-#define LCD_WIDTH 20  // Number of characters per line on LCD
-#define LCD_HEIGHT 4  // Number of lines on LCD
 
 #include <Wire.h>
 // The LiquidCrystal library needed is from
@@ -69,8 +72,21 @@ unsigned long alarmEndTime;
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 unsigned long clearTime;  // time at which to turn off backlight
 
+class IotsaDisplayMod : IotsaApiMod {
+public:
+  IotsaDisplayMod(IotsaApplication &_app) : IotsaApiMod(_app) {}
+  void setup();
+  void serverSetup();
+  void loop();
+  String info();
+protected:
+  bool postHandler(const char *path, const JsonVariant& request, JsonObject& reply);
+private:
+  void handler();
+};
+
 // LCD handlers
-void lcdSetup() {
+void IotsaDisplayMod::setup() {
   IFDEBUG IotsaSerial.print("lcdSetup");
   Wire.begin(PIN_SDA, PIN_SCL);
   lcd.begin(LCD_WIDTH, LCD_HEIGHT);
@@ -88,7 +104,7 @@ void lcdSetup() {
 int x=0;
 int y=0;
 
-void lcdHandler() {
+void IotsaDisplayMod::handler() {
   String msg;
   bool any = false;
   bool didBacklight = false;
@@ -183,11 +199,64 @@ void lcdHandler() {
   
 }
 
-String lcdInfo() {
+bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+  bool any = false;
+  if (!request.is<JsonObject>()) return false;
+  JsonObject& reqObj = request.as<JsonObject>();
+  if (reqObj.get<bool>("clear")) {
+    any = true;
+    lcd.clear();
+  }
+  if (reqObj.containsKey("x") || reqObj.containsKey("y")) {
+    x = reqObj.get<int>("x");
+    y = reqObj.get<int>("y");
+    lcd.setCursor(x, y);
+    any = true;
+  }
+#ifdef PIN_ALARM
+  int alarm = reqObj.get<int>("alarm");
+  if (alarm) {
+    any = true;
+    alarmEndTime = millis() + alarm*100;
+    IotsaSerial.println("alarm on");
+    pinMode(PIN_ALARM, OUTPUT);
+    digitalWrite(PIN_ALARM, LOW);
+    
+  }
+#endif // PIN_ALARM
+  int backlight = 5000;
+  if (reqObj.containsKey("backlight")) {
+    backlight = int(reqObj.get<float>("backlight") * 1000);
+  }
+  if (backlight) {
+    clearTime = millis() + backlight;
+    lcd.backlight();
+  } else {
+    lcd.noBacklight();
+  }
+  String msg = reqObj.get<String>("msg");
+  if (msg != "") {
+    any = true;
+    for (int i=0; i<msg.length(); i++) {
+      char newch = msg.charAt(i);
+      lcd.print(newch);
+      x++;
+      if (x >= LCD_WIDTH) {
+        x = 0;
+        y++;
+        if (y >= LCD_HEIGHT) y = 0;
+        lcd.setCursor(x, y);
+      }
+    }
+  }
+  return any;
+}
+
+String IotsaDisplayMod::info() {
   return "<p>See <a href='/display'>/display</a> to display messages.";
 }
 
-void lcdLoop() {
+void IotsaDisplayMod::loop() {
   if (clearTime && millis() > clearTime) {
     clearTime = 0;
     lcd.noBacklight();
@@ -201,8 +270,12 @@ void lcdLoop() {
 #endif
 }
 
-IotsaSimpleMod displayMod(application, "/display", lcdHandler, lcdInfo);
+void IotsaDisplayMod::serverSetup() {
+  server.on("/display", std::bind(&IotsaDisplayMod::handler, this));
+  api.setup("/api/display", false, false, true);
+}
 
+IotsaDisplayMod displayMod(application);
 #endif // WITH_LCD
 
 //
@@ -214,14 +287,16 @@ typedef struct _Button {
   int pin;
   String url;
   String fingerprint;
+  String credentials;
+  String token;
   int debounceState;
   int debounceTime;
   bool buttonState;
 } Button;
 
 Button buttons[] = {
-  { 13, "", "", 0, 0, false},
-  { 12, "", "", 0, 0, false}
+  { PIN_BUTTON_1, "", "", "", "", 0, 0, false},
+  { PIN_BUTTON_2, "", "", "", "", 0, 0, false}
 };
 
 const int nButton = sizeof(buttons) / sizeof(buttons[0]);
@@ -229,34 +304,62 @@ const int nButton = sizeof(buttons) / sizeof(buttons[0]);
 #define DEBOUNCE_DELAY 50 // 50 ms debouncing
 #define BUTTON_BEEP_DUR 10  // 10ms beep for button press
 
-void buttonConfigLoad() {
+class IotsaButtonMod : IotsaApiMod {
+public:
+  IotsaButtonMod(IotsaApplication &_app) : IotsaApiMod(_app) {}
+  void setup();
+  void serverSetup();
+  void loop();
+  String info();
+protected:
+  bool getHandler(const char *path, JsonObject& reply);
+  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply);
+  void configLoad();
+  void configSave();
+  void handler();
+};
+
+
+void IotsaButtonMod::configLoad() {
   IotsaConfigFileLoad cf("/config/buttons.cfg");
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1) + "url";
     cf.get(name, buttons[i].url, "");
     name = "button" + String(i+1) + "fingerprint";
     cf.get(name, buttons[i].fingerprint, "");
+#ifdef WITH_CREDENTIALS
+    name = "button" + String(i+1) + "credentials";
+    cf.get(name, buttons[i].credentials, "");
+#endif
+    name = "button" + String(i+1) + "token";
+    cf.get(name, buttons[i].token, "");
   }
 }
 
-void buttonConfigSave() {
+void IotsaButtonMod::configSave() {
   IotsaConfigFileSave cf("/config/buttons.cfg");
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1) + "url";
     cf.put(name, buttons[i].url);
     name = "button" + String(i+1) + "fingerprint";
     cf.put(name, buttons[i].fingerprint);
+#ifdef WITH_CREDENTIALS
+    name = "button" + String(i+1) + "credentials";
+    cf.put(name, buttons[i].credentials);
+#endif
+    name = "button" + String(i+1) + "token";
+    cf.put(name, buttons[i].token);
   }
 }
 
-void buttonSetup() {
+void IotsaButtonMod::setup() {
   for (int i=0; i<nButton; i++) {
     pinMode(buttons[i].pin, INPUT_PULLUP);
   }
-  buttonConfigLoad();
+  configLoad();
 }
 
-void buttonHandler() {
+void IotsaButtonMod::handler() {
   bool any = false;
   bool isJSON = false;
 
@@ -280,12 +383,32 @@ void buttonHandler() {
         IFDEBUG IotsaSerial.println(buttons[j].fingerprint);
         any = true;
       }
+#ifdef WITH_CREDENTIALS
+      wtdName = "button" + String(j+1) + "credentials";
+      if (server.argName(i) == wtdName) {
+        String arg = server.arg(i);
+        decodePercentEscape(arg, &buttons[j].credentials);
+        IFDEBUG IotsaSerial.print(wtdName);
+        IFDEBUG IotsaSerial.print("=");
+        IFDEBUG IotsaSerial.println(buttons[j].credentials);
+        any = true;
+      }
+#endif
+      wtdName = "button" + String(j+1) + "token";
+      if (server.argName(i) == wtdName) {
+        String arg = server.arg(i);
+        decodePercentEscape(arg, &buttons[j].token);
+        IFDEBUG IotsaSerial.print(wtdName);
+        IFDEBUG IotsaSerial.print("=");
+        IFDEBUG IotsaSerial.println(buttons[j].token);
+        any = true;
+      }
     }
     if (server.argName(i) == "format" && server.arg(i) == "json") {
       isJSON = true;
     }
   }
-  if (any) buttonConfigSave();
+  if (any) configSave();
   if (isJSON) {
     String message = "{\"buttons\" : [";
     for (int i=0; i<nButton; i++) {
@@ -303,13 +426,27 @@ void buttonHandler() {
       message += "url\" : \"";
       message += buttons[i].url;
       message += "\"";
-      if (buttons[i].fingerprint != "") {
-        message += ", \"button";
-        message += String(i+1);
-        message += "fingerprint\" : \"";
-        message += buttons[i].fingerprint;
-        message += "\"";
-      }
+
+      message += ", \"button";
+      message += String(i+1);
+      message += "fingerprint\" : \"";
+      message += buttons[i].fingerprint;
+      message += "\"";
+
+#ifdef WITH_CREDENTIALS
+      message += ", \"button";
+      message += String(i+1);
+      message += "credentials\" : \"";
+      message += buttons[i].credentials;
+      message += "\"";
+#endif
+
+      message += ", \"button";
+      message += String(i+1);
+      message += "token\" : \"";
+      message += buttons[i].token;
+      message += "\"";
+
     }
     message += "\"}\n";
     server.send(200, "application/json", message);
@@ -322,53 +459,74 @@ void buttonHandler() {
     }
     message += "<form method='get'>";
     for (int i=0; i<nButton; i++) {
-      message += "Button " + String(i+1) + " activation URL: <input name='button" + String(i+1) + "url' value='";
+      message += "<em>Button " + String(i+1) + "</em><br>\n";
+      message += "Activation URL: <input name='button" + String(i+1) + "url' value='";
       message += buttons[i].url;
       message += "'><br>\n";
-      message += "Button " + String(i+1) + " fingerprint (https-only): <input name='button" + String(i+1) + "fingerprint' value='";
+
+      message += "Fingerprint <i>(https only)</i>: <input name='button" + String(i+1) + "fingerprint' value='";
       message += buttons[i].fingerprint;
       message += "'><br>\n";
+
+      message += "Bearer token <i>(optional)</i>: <input name='button" + String(i+1) + "token' value='";
+      message += buttons[i].token;
+      message += "'><br>\n";
+
+#ifdef WITH_CREDENTIALS
+      message += "Credentials <i>(optional, user:pass)</i>: <input name='button" + String(i+1) + "credentials' value='";
+      message += buttons[i].credentials;
+      message += "'><br>\n";
+#endif
+
     }
     message += "<input type='submit'></form></body></html>";
     server.send(200, "text/html", message);
   }
 }
 
-String buttonInfo() {
+String IotsaButtonMod::info() {
   return "<p>See <a href='/buttons'>/buttons</a> to program URLs for button presses.</a>";
 }
 
-bool sendRequest(String& urlStr, String& fingerprint) {
+bool sendRequest(String urlStr, String token, String credentials, String fingerprint) {
   bool rv = true;
   HTTPClient http;
 
   if (urlStr.startsWith("https:")) {
     http.begin(urlStr, fingerprint);
   } else {
-    http.begin(urlStr);
+    http.begin(urlStr);  
   }
+  if (token != "") {
+    http.addHeader("Authorization", "Bearer " + token);
+  }
+
+#ifdef WITH_CREDENTIALS
+  if (credentials != "") {
+  	String cred64 = b64encode(credentials);
+    http.addHeader("Authorization", "Bearer " + cred64);
+  }
+#endif
   int code = http.GET();
-  if (code >= 200 && code < 300) {
-    IFDEBUG IotsaSerial.print("OK GET ");
+  if (code >= 200 && code <= 299) {
     IFDEBUG IotsaSerial.print(code);
-    IFDEBUG IotsaSerial.print(" ");
+    IFDEBUG IotsaSerial.print(" OK GET ");
     IFDEBUG IotsaSerial.println(urlStr);
-#ifdef PIN_ALARM
+ #ifdef PIN_ALARM
     alarmEndTime = millis() + BUTTON_BEEP_DUR;
     pinMode(PIN_ALARM, OUTPUT);
     digitalWrite(PIN_ALARM, LOW);
 #endif // PIN_ALARM
   } else {
-    IFDEBUG IotsaSerial.print("FAIL GET ");
     IFDEBUG IotsaSerial.print(code);
-    IFDEBUG IotsaSerial.print(" ");
+    IFDEBUG IotsaSerial.print(" FAIL GET ");
     IFDEBUG IotsaSerial.println(urlStr);
   }
   http.end();
   return rv;
 }
 
-void buttonLoop() {
+void IotsaButtonMod::loop() {
   for (int i=0; i<nButton; i++) {
     int state = digitalRead(buttons[i].pin);
     if (state != buttons[i].debounceState) {
@@ -379,15 +537,67 @@ void buttonLoop() {
       int newButtonState = (state == LOW);
       if (newButtonState != buttons[i].buttonState) {
         buttons[i].buttonState = newButtonState;
-        if (buttons[i].buttonState && buttons[i].url != "") sendRequest(buttons[i].url, buttons[i].fingerprint);
+        if (buttons[i].buttonState && buttons[i].url != "") {
+        	sendRequest(buttons[i].url, buttons[i].token, buttons[i].credentials, buttons[i].fingerprint);
+        }
       }
     }
   }
-
 }
 
-IotsaSimpleMod buttonMod(application, "/buttons", buttonHandler, buttonInfo);
+bool IotsaButtonMod::getHandler(const char *path, JsonObject& reply) {
+  JsonArray& rv = reply.createNestedArray("buttons");
+  for (Button *b=buttons; b<buttons+nButton; b++) {
+    JsonObject& bRv = rv.createNestedObject();
+    bRv["url"] = b->url;
+    bRv["fingerprint"] = b->fingerprint;
+    bRv["state"] = b->buttonState;
+    bRv["hasCredentials"] = b->credentials != "";
+    bRv["hasToken"] = b->token != "";
+  }
+  return true;
+}
 
+bool IotsaButtonMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+  Button *b;
+  if (strcmp(path, "/api/buttons/0") == 0) {
+    b = &buttons[0];
+  } else if (strcmp(path, "/api/buttons/1") == 0) {
+    b = &buttons[1];
+  } else {
+    return false;
+  }
+  if (!request.is<JsonObject>()) return false;
+  JsonObject& reqObj = request.as<JsonObject>();
+  bool any = false;
+  if (reqObj.containsKey("url")) {
+    any = true;
+    b->url = reqObj.get<String>("url");
+  }
+  if (reqObj.containsKey("fingerprint")) {
+    any = true;
+    b->fingerprint = reqObj.get<String>("fingerprint");
+  }
+  if (reqObj.containsKey("credentials")) {
+    any = true;
+    b->credentials = reqObj.get<String>("credentials");
+  }
+  if (reqObj.containsKey("token")) {
+    any = true;
+    b->token = reqObj.get<String>("token");
+  }
+  if (any) configSave();
+  return any;
+}
+
+void IotsaButtonMod::serverSetup() {
+  server.on("/buttons", std::bind(&IotsaButtonMod::handler, this));
+  api.setup("/api/buttons", true, false);
+  api.setup("/api/buttons/0", false, true);
+  api.setup("/api/buttons/1", false, true);
+}
+
+IotsaButtonMod buttonMod(application);
 #endif // WITH_BUTTON
 
 //
@@ -437,21 +647,9 @@ static void decodePercentEscape(String &src, String *dst) {
 void setup(void) {
   application.setup();
   application.serverSetup();
-#ifdef WITH_LCD
-  lcdSetup();
-#endif
-#ifdef WITH_BUTTONS
-  buttonSetup();
-#endif
   ESP.wdtEnable(WDTO_120MS);
 }
  
 void loop(void) {
   application.loop();
-#ifdef WITH_LCD
-  lcdLoop();
-#endif
-#ifdef WITH_BUTTONS
-  buttonLoop();
-#endif
 } 
