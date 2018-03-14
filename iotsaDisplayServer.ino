@@ -21,9 +21,9 @@
 #include "iotsaFilesBackup.h"
 #include "iotsaSimple.h"
 #include "iotsaConfigFile.h"
+#include "iotsaApi.h"
 
 #define WITH_OTA // Define if you have an ESP12E or other board with enough Flash memory to allow OTA updates
-
 #define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (undefine for no buzzer)
 #define WITH_LCD       // Enable support for LCD, undefine to disable
 #define LCD_WIDTH 20  // Number of characters per line on LCD
@@ -45,6 +45,7 @@ IotsaWifiMod wifiMod(application);  // wifi is always needed
 #ifdef WITH_OTA
 IotsaOtaMod otaMod(application);    // we want OTA for updating the software (will not work with esp-201)
 #endif
+
 IotsaFilesBackupMod filesBackupMod(application);  // we want backup to clone the display server
 
 static void decodePercentEscape(String &src, String *dst); // Forward declaration
@@ -504,7 +505,7 @@ bool sendRequest(String urlStr, String token, String credentials, String fingerp
 #ifdef WITH_CREDENTIALS
   if (credentials != "") {
   	String cred64 = b64encode(credentials);
-    http.addHeader("Authorization", "Bearer " + cred64);
+    http.addHeader("Authorization", "Basic " + cred64);
   }
 #endif
   int code = http.GET();
@@ -520,7 +521,9 @@ bool sendRequest(String urlStr, String token, String credentials, String fingerp
   } else {
     IFDEBUG IotsaSerial.print(code);
     IFDEBUG IotsaSerial.print(" FAIL GET ");
-    IFDEBUG IotsaSerial.println(urlStr);
+    IFDEBUG IotsaSerial.print(urlStr);
+    IFDEBUG IotsaSerial.print(", fingerprint ");
+    IFDEBUG IotsaSerial.println(fingerprint);
   }
   http.end();
   return rv;
