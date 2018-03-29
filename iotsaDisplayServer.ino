@@ -598,6 +598,7 @@ void IotsaButtonMod::serverSetup() {
   api.setup("/api/buttons", true, false);
   api.setup("/api/buttons/0", false, true);
   api.setup("/api/buttons/1", false, true);
+  name = "buttons";
 }
 
 IotsaButtonMod buttonMod(application);
