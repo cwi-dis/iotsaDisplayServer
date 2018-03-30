@@ -35,14 +35,6 @@
 #define PIN_BUTTON_2 12
 #undef WITH_CREDENTIALS
 
-#undef MDNS_CLIENT_WORKAROUND
-#ifdef MDNS_CLIENT_WORKAROUND
-#include <ESP8266mDNS.h>
-#include <lwip/ip_addr.h>
-#include <lwip/err.h>
-#include <lwip/dns.h>
-#endif
-
 #define IFDEBUGX if(0)
 
 ESP8266WebServer server(80);
@@ -493,64 +485,14 @@ void IotsaButtonMod::handler() {
   }
 }
 
-#ifdef MDNS_CLIENT_WORKAROUND
-static void ensureHostnameKnown(String url) {
-  // check for : http: or https:
-  int index = url.indexOf(':');
-  if(index < 0) return; // Invalid URL.
-  url.remove(0, (index + 3)); // remove http:// or https://
-
-  index = url.indexOf('/');
-  String host = url.substring(0, index);
-
-  // Check for Authorization
-  index = host.indexOf('@');
-  if(index >= 0) {
-      // auth info
-      host.remove(0, index + 1); // remove auth part including @
-  }
-
-  // Check for port
-  index = host.indexOf(':');
-  if(index >= 0) {
-      host = host.substring(0, index); // hostname
-  }
-  IFDEBUG IotsaSerial.print("xxxjack Need hostname ");
-  IFDEBUG IotsaSerial.println(host);
-  // We have got the hostname. If it ends in .local or .local. we check whether it exists.
-  if (host.endsWith(".local") || host.endsWith(".local.")) {
-    ip_addr_t dummy;
-    err_t err = dns_gethostbyname(host.c_str(), &dummy, NULL, NULL);
-    if (err == 0) return; // Hostname known, everything fine.
-    IFDEBUG IotsaSerial.println("Not known");
-    int n = MDNS.queryService("http", "tcp");
-    for (int i=0; i<n; i++) {
-      String foundName(MDNS.hostname(i));
-      IFDEBUG IotsaSerial.print("Found ");
-      IFDEBUG IotsaSerial.println(foundName);
-      if (host.startsWith(foundName)) {
-        ip_addr_t foundIP = MDNS.IP(i);
-        IFDEBUG IotsaSerial.print("Matches, ip=");
-        IFDEBUG IotsaSerial.println(foundIP);
-        err = dns_local_addhost(foundName.c_str(), &foundIP);
-        IFDEBUG IotsaSerial.print("err=");
-        IFDEBUG IotsaSerial.println(err);
-        break;
-      }
-    }
-  }
-}
-#endif // MDNS_CLIENT_WORKAROUND
 String IotsaButtonMod::info() {
   return "<p>See <a href='/buttons'>/buttons</a> to program URLs for button presses.</a>";
 }
 
-static bool sendRequest(String urlStr, String token, String credentials, String fingerprint) {
+bool sendRequest(String urlStr, String token, String credentials, String fingerprint) {
   bool rv = true;
   HTTPClient http;
-#ifdef MDNS_CLIENT_WORKAROUND
-  ensureHostnameKnown(urlStr);
-#endif
+
   if (urlStr.startsWith("https:")) {
     http.begin(urlStr, fingerprint);
   } else {
