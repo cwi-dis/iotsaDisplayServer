@@ -24,15 +24,13 @@
 # Template #1: General project. Test it using existing `platformio.ini`.
 #
 
-# language: python
-# python:
-#     - "2.7"
-#
+language: python
+python:
+    - "2.7"
 # install:
-#     - pip install -U platformio
-#
-# script:
-#     - platformio run
+    - pip install -U platformio
+script:
+    - platformio run
 
 
 #
