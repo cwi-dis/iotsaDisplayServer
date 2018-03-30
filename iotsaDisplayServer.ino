@@ -12,8 +12,6 @@
 // License TBD.
 //
 
-#include <ESP.h>
-#include <FS.h>
 #include <ESP8266HTTPClient.h>
 #include "iotsa.h"
 #include "iotsaWifi.h"
