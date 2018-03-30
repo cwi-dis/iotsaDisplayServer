@@ -529,10 +529,11 @@ static void ensureHostnameKnown(String url) {
       IFDEBUG IotsaSerial.print("Found ");
       IFDEBUG IotsaSerial.println(foundName);
       if (host.startsWith(foundName)) {
-        ip_addr_t foundIP = MDNS.IP(i);
+        IPAddress foundIP = MDNS.IP(i);
         IFDEBUG IotsaSerial.print("Matches, ip=");
         IFDEBUG IotsaSerial.println(foundIP);
-        err = dns_local_addhost(foundName.c_str(), &foundIP);
+        uint32_t addrBytes = foundIP;
+        err = dns_local_addhost(foundName.c_str(), (ip_addr_t*)&addrBytes);
         IFDEBUG IotsaSerial.print("err=");
         IFDEBUG IotsaSerial.println(err);
         break;
