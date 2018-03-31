@@ -13,4 +13,7 @@ deploy:
   skip_cleanup: true
   on:
     repo: cwi-dis/iotsaDisplayServer
+    tags: true
+    all_branches: true
+    
 
