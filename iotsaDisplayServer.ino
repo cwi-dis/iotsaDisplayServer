@@ -12,7 +12,6 @@
 // License TBD.
 //
 
-#include <ESP8266HTTPClient.h>
 #include "iotsa.h"
 #include "iotsaWifi.h"
 #include "iotsaOta.h"
@@ -20,7 +19,11 @@
 #include "iotsaSimple.h"
 #include "iotsaConfigFile.h"
 #include "iotsaApi.h"
-
+#ifdef ESP32
+#include <HTTPClient.h>
+#else
+#include <ESP8266HTTPClient.h>
+#endif
 #define WITH_OTA // Define if you have an ESP12E or other board with enough Flash memory to allow OTA updates
 #define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (undefine for no buzzer)
 #define WITH_LCD       // Enable support for LCD, undefine to disable
@@ -35,7 +38,7 @@
 
 #define IFDEBUGX if(0)
 
-ESP8266WebServer server(80);
+IotsaWebServer server(80);
 IotsaApplication application(server, "LCD Display Server");
 
 // Configure modules we need
@@ -281,11 +284,16 @@ IotsaDisplayMod displayMod(application);
 // Button parameters and implementation
 //
 #ifdef WITH_BUTTONS
+#ifdef ESP32
+#define SSL_INFO_NAME "rootCA"
+#else
+#define SSL_INFO_NAME "fingerprint"
+#endif
 
 typedef struct _Button {
   int pin;
   String url;
-  String fingerprint;
+  String sslInfo;
   String credentials;
   String token;
   int debounceState;
@@ -324,8 +332,8 @@ void IotsaButtonMod::configLoad() {
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1) + "url";
     cf.get(name, buttons[i].url, "");
-    name = "button" + String(i+1) + "fingerprint";
-    cf.get(name, buttons[i].fingerprint, "");
+    name = "button" + String(i+1) + SSL_INFO_NAME;
+    cf.get(name, buttons[i].sslInfo, "");
 #ifdef WITH_CREDENTIALS
     name = "button" + String(i+1) + "credentials";
     cf.get(name, buttons[i].credentials, "");
@@ -340,8 +348,8 @@ void IotsaButtonMod::configSave() {
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1) + "url";
     cf.put(name, buttons[i].url);
-    name = "button" + String(i+1) + "fingerprint";
-    cf.put(name, buttons[i].fingerprint);
+    name = "button" + String(i+1) + SSL_INFO_NAME;
+    cf.put(name, buttons[i].sslInfo);
 #ifdef WITH_CREDENTIALS
     name = "button" + String(i+1) + "credentials";
     cf.put(name, buttons[i].credentials);
@@ -360,7 +368,6 @@ void IotsaButtonMod::setup() {
 
 void IotsaButtonMod::handler() {
   bool any = false;
-  bool isJSON = false;
 
   for (uint8_t i=0; i<server.args(); i++){
     for (int j=0; j<nButton; j++) {
@@ -373,13 +380,13 @@ void IotsaButtonMod::handler() {
         IFDEBUG IotsaSerial.println(buttons[j].url);
         any = true;
       }
-      wtdName = "button" + String(j+1) + "fingerprint";
+      wtdName = "button" + String(j+1) + SSL_INFO_NAME;
       if (server.argName(i) == wtdName) {
         String arg = server.arg(i);
-        decodePercentEscape(arg, &buttons[j].fingerprint);
+        decodePercentEscape(arg, &buttons[j].sslInfo);
         IFDEBUG IotsaSerial.print(wtdName);
         IFDEBUG IotsaSerial.print("=");
-        IFDEBUG IotsaSerial.println(buttons[j].fingerprint);
+        IFDEBUG IotsaSerial.println(buttons[j].sslInfo);
         any = true;
       }
 #ifdef WITH_CREDENTIALS
@@ -403,96 +410,59 @@ void IotsaButtonMod::handler() {
         any = true;
       }
     }
-    if (server.argName(i) == "format" && server.arg(i) == "json") {
-      isJSON = true;
-    }
   }
   if (any) configSave();
-  if (isJSON) {
-    String message = "{\"buttons\" : [";
-    for (int i=0; i<nButton; i++) {
-      if (i > 0) message += ", ";
-      if (buttons[i].buttonState) {
-        message += "true";
-      } else {
-        message += "false";
-      }
-    }
-    message += "]";
-    for (int i=0; i<nButton; i++) {
-      message += ", \"button";
-      message += String(i+1);
-      message += "url\" : \"";
-      message += buttons[i].url;
-      message += "\"";
 
-      message += ", \"button";
-      message += String(i+1);
-      message += "fingerprint\" : \"";
-      message += buttons[i].fingerprint;
-      message += "\"";
-
-#ifdef WITH_CREDENTIALS
-      message += ", \"button";
-      message += String(i+1);
-      message += "credentials\" : \"";
-      message += buttons[i].credentials;
-      message += "\"";
-#endif
-
-      message += ", \"button";
-      message += String(i+1);
-      message += "token\" : \"";
-      message += buttons[i].token;
-      message += "\"";
-
-    }
-    message += "\"}\n";
-    server.send(200, "application/json", message);
-  } else {
-    String message = "<html><head><title>LCD Server Buttons</title></head><body><h1>LCD Server Buttons</h1>";
-    for (int i=0; i<nButton; i++) {
-      message += "<p>Button " + String(i+1) + ": ";
-      if (buttons[i].buttonState) message += "on"; else message += "off";
-      message += "</p>";
-    }
-    message += "<form method='get'>";
-    for (int i=0; i<nButton; i++) {
-      message += "<em>Button " + String(i+1) + "</em><br>\n";
-      message += "Activation URL: <input name='button" + String(i+1) + "url' value='";
-      message += buttons[i].url;
-      message += "'><br>\n";
-
-      message += "Fingerprint <i>(https only)</i>: <input name='button" + String(i+1) + "fingerprint' value='";
-      message += buttons[i].fingerprint;
-      message += "'><br>\n";
-
-      message += "Bearer token <i>(optional)</i>: <input name='button" + String(i+1) + "token' value='";
-      message += buttons[i].token;
-      message += "'><br>\n";
-
-#ifdef WITH_CREDENTIALS
-      message += "Credentials <i>(optional, user:pass)</i>: <input name='button" + String(i+1) + "credentials' value='";
-      message += buttons[i].credentials;
-      message += "'><br>\n";
-#endif
-
-    }
-    message += "<input type='submit'></form></body></html>";
-    server.send(200, "text/html", message);
+  String message = "<html><head><title>LCD Server Buttons</title></head><body><h1>LCD Server Buttons</h1>";
+  for (int i=0; i<nButton; i++) {
+    message += "<p>Button " + String(i+1) + ": ";
+    if (buttons[i].buttonState) message += "on"; else message += "off";
+    message += "</p>";
   }
+  message += "<form method='get'>";
+  for (int i=0; i<nButton; i++) {
+    message += "<em>Button " + String(i+1) + "</em><br>\n";
+    message += "Activation URL: <input name='button" + String(i+1) + "url' value='";
+    message += buttons[i].url;
+    message += "'><br>\n";
+#ifdef ESP32
+    message += "Root CA cert <i>(https only)</i>: <input name='button" + String(i+1) + "rootCA' value='";
+    message += buttons[i].sslInfo;
+#else
+    message += "Fingerprint <i>(https only)</i>: <input name='button" + String(i+1) + "fingerprint' value='";
+    message += buttons[i].sslInfo;
+#endif
+    message += "'><br>\n";
+
+    message += "Bearer token <i>(optional)</i>: <input name='button" + String(i+1) + "token' value='";
+    message += buttons[i].token;
+    message += "'><br>\n";
+
+#ifdef WITH_CREDENTIALS
+    message += "Credentials <i>(optional, user:pass)</i>: <input name='button" + String(i+1) + "credentials' value='";
+    message += buttons[i].credentials;
+    message += "'><br>\n";
+#endif
+
+  }
+  message += "<input type='submit'></form></body></html>";
+  server.send(200, "text/html", message);
 }
 
 String IotsaButtonMod::info() {
   return "<p>See <a href='/buttons'>/buttons</a> to program URLs for button presses.</a>";
 }
 
-bool sendRequest(String urlStr, String token, String credentials, String fingerprint) {
+bool sendRequest(String urlStr, String token, String credentials, String sslInfo) {
   bool rv = true;
   HTTPClient http;
 
   if (urlStr.startsWith("https:")) {
-    http.begin(urlStr, fingerprint);
+#ifdef ESP32
+    http.begin(urlStr, sslInfo.c_str());
+#else
+    http.begin(urlStr, sslInfo);
+#endif
   } else {
     http.begin(urlStr);  
   }
@@ -520,8 +490,12 @@ bool sendRequest(String urlStr, String token, String credentials, String fingerp
     IFDEBUG IotsaSerial.print(code);
     IFDEBUG IotsaSerial.print(" FAIL GET ");
     IFDEBUG IotsaSerial.print(urlStr);
+#ifdef ESP32
+    IFDEBUG IotsaSerial.print(", RootCA ");
+#else
     IFDEBUG IotsaSerial.print(", fingerprint ");
-    IFDEBUG IotsaSerial.println(fingerprint);
+#endif
+    IFDEBUG IotsaSerial.println(sslInfo);
   }
   http.end();
   return rv;
@@ -539,7 +513,7 @@ void IotsaButtonMod::loop() {
       if (newButtonState != buttons[i].buttonState) {
         buttons[i].buttonState = newButtonState;
         if (buttons[i].buttonState && buttons[i].url != "") {
-        	sendRequest(buttons[i].url, buttons[i].token, buttons[i].credentials, buttons[i].fingerprint);
+        	sendRequest(buttons[i].url, buttons[i].token, buttons[i].credentials, buttons[i].sslInfo);
         }
       }
     }
@@ -551,7 +525,7 @@ bool IotsaButtonMod::getHandler(const char *path, JsonObject& reply) {
   for (Button *b=buttons; b<buttons+nButton; b++) {
     JsonObject& bRv = rv.createNestedObject();
     bRv["url"] = b->url;
-    bRv["fingerprint"] = b->fingerprint;
+    bRv[SSL_INFO_NAME] = b->sslInfo;
     bRv["state"] = b->buttonState;
     bRv["hasCredentials"] = b->credentials != "";
     bRv["hasToken"] = b->token != "";
@@ -575,9 +549,9 @@ bool IotsaButtonMod::putHandler(const char *path, const JsonVariant& request, Js
     any = true;
     b->url = reqObj.get<String>("url");
   }
-  if (reqObj.containsKey("fingerprint")) {
+  if (reqObj.containsKey(SSL_INFO_NAME)) {
     any = true;
-    b->fingerprint = reqObj.get<String>("fingerprint");
+    b->sslInfo = reqObj.get<String>(SSL_INFO_NAME);
   }
   if (reqObj.containsKey("credentials")) {
     any = true;
@@ -649,7 +623,9 @@ static void decodePercentEscape(String &src, String *dst) {
 void setup(void) {
   application.setup();
   application.serverSetup();
+#ifndef ESP32
   ESP.wdtEnable(WDTO_120MS);
+#endif
 }
  
 void loop(void) {
