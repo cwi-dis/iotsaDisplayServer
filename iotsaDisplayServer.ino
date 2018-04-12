@@ -49,7 +49,6 @@ IotsaOtaMod otaMod(application);    // we want OTA for updating the software (wi
 
 IotsaFilesBackupMod filesBackupMod(application);  // we want backup to clone the display server
 
-static void decodePercentEscape(String &src, String *dst); // Forward declaration
 
 //
 // Buzzer configuration and implementation
@@ -63,221 +62,8 @@ unsigned long alarmEndTime;
 //
 #ifdef WITH_LCD
 // Includes and defines for liquid crystal server
-
-#include <Wire.h>
-// The LiquidCrystal library needed is from
-// https://bitbucket.org/fmalpartida/new-liquidcrystal/downloads/LiquidCrystal_V1.2.1.zip
-#include <LiquidCrystal_I2C.h>
-
-
-
-LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
-unsigned long clearTime;  // time at which to turn off backlight
-
-class IotsaDisplayMod : IotsaApiMod {
-public:
-  IotsaDisplayMod(IotsaApplication &_app) : IotsaApiMod(_app) {}
-  void setup();
-  void serverSetup();
-  void loop();
-  String info();
-protected:
-  bool postHandler(const char *path, const JsonVariant& request, JsonObject& reply);
-private:
-  void handler();
-};
-
-// LCD handlers
-void IotsaDisplayMod::setup() {
-  IFDEBUG IotsaSerial.print("lcdSetup");
-  Wire.begin(PIN_SDA, PIN_SCL);
-  lcd.begin(LCD_WIDTH, LCD_HEIGHT);
-  lcd.backlight();
-  lcd.print(hostName);
-  delay(200);
-  lcd.noBacklight();
-  lcd.clear();
-#ifdef PIN_ALARM
-  pinMode(PIN_ALARM, INPUT); // Trick: we configure to input so we make the pin go Hi-Z.
-#endif
-  IFDEBUG IotsaSerial.println(" done");
-}
-
-int x=0;
-int y=0;
-
-void IotsaDisplayMod::handler() {
-  String msg;
-  bool any = false;
-  bool didBacklight = false;
-  bool didPos = false;
-
-  for (uint8_t i=0; i<server.args(); i++){
-    if( server.argName(i) == "msg") {
-      msg = server.arg(i);
-      any = true;
-    }
-    if( server.argName(i) == "clear") {
-      if (atoi(server.arg(i).c_str()) > 0) {
-        lcd.clear();
-        if (!didPos) x = y = 0;
-      }
-      any = true;
-    }
-    if( server.argName(i) == "x") {
-      const char *arg = server.arg(i).c_str();
-      if (arg && *arg) {
-        didPos = true;
-        x = atoi(server.arg(i).c_str());
-      }
-    }
-    if( server.argName(i) == "y") {
-      const char *arg = server.arg(i).c_str();
-      if (arg && *arg) {
-        didPos = true;
-        y = atoi(server.arg(i).c_str());
-      }
-    }
-    if (server.argName(i) == "backlight") {
-      const char *arg = server.arg(i).c_str();
-      if (arg && *arg) {
-        int dur = atoi(server.arg(i).c_str());
-//        IFDEBUG IotsaSerial.print("arg backlight=");
-//        IFDEBUG IotsaSerial.println(dur);
-        any = true;
-        didBacklight = true;
-        if (dur) {
-          clearTime = millis() + dur*1000;
-        } else {
-          clearTime = 0;
-        }
-        any = true;
-      }
-    }
-#ifdef PIN_ALARM
-    if (server.argName(i) == "alarm") {
-      const char *arg = server.arg(i).c_str();
-      if (arg && *arg) {
-        int dur = atoi(server.arg(i).c_str());
-//        IFDEBUG IotsaSerial.print("arg alarm=");
-//        IFDEBUG IotsaSerial.println(dur);
-        if (dur) {
-          alarmEndTime = millis() + dur*100;
-          IotsaSerial.println("alarm on");
-          pinMode(PIN_ALARM, OUTPUT);
-          digitalWrite(PIN_ALARM, LOW);
-        } else {
-          alarmEndTime = 0;
-        }
-      }
-    }
-#endif
-  }
-  if (any) {
-      lcd.setCursor(x, y);
-//      IFDEBUG IotsaSerial.print("Show message ");
-//      IFDEBUG IotsaSerial.println(msg);
-      decodePercentEscape(msg, NULL);
-      if (!didBacklight) 
-         clearTime = millis() + 5000; // 5 seconds is the default display time
-      if (clearTime) {
-        IFDEBUG IotsaSerial.println("backlight");
-        lcd.backlight();
-      } else {
-        IFDEBUG IotsaSerial.println("nobacklight");
-        lcd.noBacklight();
-      }
-  }
-  String message = "<html><head><title>LCD Server</title></head><body><h1>LCD Server</h1>";
-  message += "<form method='get'>Message: <input name='msg' value=''><br>\n";
-  message += "Position X: <input name='x' value=''> Y: <input name='y' value=''><br>\n";
-  message += "<input name='clear' type='checkbox' value='1'>Clear<br>\n";
-  message += "Backlight: <input name='backlight' value=''> seconds<br>\n";
-#ifdef PIN_ALARM
-  message += "Alarm: <input name='alarm' value=''> (times 0.1 second)<br>\n";
-#endif
-  message += "<input type='submit'></form></body></html>";
-  server.send(200, "text/html", message);
-  
-}
-
-bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
-  bool any = false;
-  if (!request.is<JsonObject>()) return false;
-  JsonObject& reqObj = request.as<JsonObject>();
-  if (reqObj.get<bool>("clear")) {
-    any = true;
-    lcd.clear();
-  }
-  if (reqObj.containsKey("x") || reqObj.containsKey("y")) {
-    x = reqObj.get<int>("x");
-    y = reqObj.get<int>("y");
-    lcd.setCursor(x, y);
-    any = true;
-  }
-#ifdef PIN_ALARM
-  int alarm = reqObj.get<int>("alarm");
-  if (alarm) {
-    any = true;
-    alarmEndTime = millis() + alarm*100;
-    IotsaSerial.println("alarm on");
-    pinMode(PIN_ALARM, OUTPUT);
-    digitalWrite(PIN_ALARM, LOW);
-    
-  }
-#endif // PIN_ALARM
-  int backlight = 5000;
-  if (reqObj.containsKey("backlight")) {
-    backlight = int(reqObj.get<float>("backlight") * 1000);
-  }
-  if (backlight) {
-    clearTime = millis() + backlight;
-    lcd.backlight();
-  } else {
-    lcd.noBacklight();
-  }
-  String msg = reqObj.get<String>("msg");
-  if (msg != "") {
-    any = true;
-    for (int i=0; i<msg.length(); i++) {
-      char newch = msg.charAt(i);
-      lcd.print(newch);
-      x++;
-      if (x >= LCD_WIDTH) {
-        x = 0;
-        y++;
-        if (y >= LCD_HEIGHT) y = 0;
-        lcd.setCursor(x, y);
-      }
-    }
-  }
-  return any;
-}
-
-String IotsaDisplayMod::info() {
-  return "<p>See <a href='/display'>/display</a> to display messages.";
-}
-
-void IotsaDisplayMod::loop() {
-  if (clearTime && millis() > clearTime) {
-    clearTime = 0;
-    lcd.noBacklight();
-  }
-#ifdef PIN_ALARM
-  if (alarmEndTime && millis() > alarmEndTime) {
-    alarmEndTime = 0;
-    IotsaSerial.println("alarm off");
-    pinMode(PIN_ALARM, INPUT);
-  }
-#endif
-}
-
-void IotsaDisplayMod::serverSetup() {
-  server.on("/display", std::bind(&IotsaDisplayMod::handler, this));
-  api.setup("/api/display", false, false, true);
-}
-
-IotsaDisplayMod displayMod(application);
+#include "iotsaDisplay.h"
+IotsaDisplayMod displayMod(application, PIN_SDA, PIN_SCL, LCD_WIDTH, LCD_HEIGHT);
 #endif // WITH_LCD
 
 //
@@ -326,6 +112,33 @@ protected:
   void handler();
 };
 
+//
+// Decode percent-escaped string src.
+// If dst is NULL the result is sent to the LCD.
+// 
+static void decodePercentEscape(const String &src, String &dst) {
+    const char *arg = src.c_str();
+    dst = String();
+    while (*arg) {
+      char newch;
+      if (*arg == '+') newch = ' ';
+      else if (*arg == '%') {
+        arg++;
+        if (*arg >= '0' && *arg <= '9') newch = (*arg-'0') << 4;
+        if (*arg >= 'a' && *arg <= 'f') newch = (*arg-'a'+10) << 4;
+        if (*arg >= 'A' && *arg <= 'F') newch = (*arg-'A'+10) << 4;
+        arg++;
+        if (*arg == 0) break;
+        if (*arg >= '0' && *arg <= '9') newch |= (*arg-'0');
+        if (*arg >= 'a' && *arg <= 'f') newch |= (*arg-'a'+10);
+        if (*arg >= 'A' && *arg <= 'F') newch |= (*arg-'A'+10);
+      } else {
+        newch = *arg;
+      }
+      dst += newch;
+      arg++;
+    }
+}
 
 void IotsaButtonMod::configLoad() {
   IotsaConfigFileLoad cf("/config/buttons.cfg");
@@ -374,7 +187,7 @@ void IotsaButtonMod::handler() {
       String wtdName = "button" + String(j+1) + "url";
       if (server.argName(i) == wtdName) {
         String arg = server.arg(i);
-        decodePercentEscape(arg, &buttons[j].url);
+        decodePercentEscape(arg, buttons[j].url);
         IFDEBUG IotsaSerial.print(wtdName);
         IFDEBUG IotsaSerial.print("=");
         IFDEBUG IotsaSerial.println(buttons[j].url);
@@ -383,7 +196,7 @@ void IotsaButtonMod::handler() {
       wtdName = "button" + String(j+1) + SSL_INFO_NAME;
       if (server.argName(i) == wtdName) {
         String arg = server.arg(i);
-        decodePercentEscape(arg, &buttons[j].sslInfo);
+        decodePercentEscape(arg, buttons[j].sslInfo);
         IFDEBUG IotsaSerial.print(wtdName);
         IFDEBUG IotsaSerial.print("=");
         IFDEBUG IotsaSerial.println(buttons[j].sslInfo);
@@ -393,7 +206,7 @@ void IotsaButtonMod::handler() {
       wtdName = "button" + String(j+1) + "credentials";
       if (server.argName(i) == wtdName) {
         String arg = server.arg(i);
-        decodePercentEscape(arg, &buttons[j].credentials);
+        decodePercentEscape(arg, buttons[j].credentials);
         IFDEBUG IotsaSerial.print(wtdName);
         IFDEBUG IotsaSerial.print("=");
         IFDEBUG IotsaSerial.println(buttons[j].credentials);
@@ -403,7 +216,7 @@ void IotsaButtonMod::handler() {
       wtdName = "button" + String(j+1) + "token";
       if (server.argName(i) == wtdName) {
         String arg = server.arg(i);
-        decodePercentEscape(arg, &buttons[j].token);
+        decodePercentEscape(arg, buttons[j].token);
         IFDEBUG IotsaSerial.print(wtdName);
         IFDEBUG IotsaSerial.print("=");
         IFDEBUG IotsaSerial.println(buttons[j].token);
@@ -576,46 +389,6 @@ void IotsaButtonMod::serverSetup() {
 IotsaButtonMod buttonMod(application);
 #endif // WITH_BUTTON
 
-//
-// Decode percent-escaped string src.
-// If dst is NULL the result is sent to the LCD.
-// 
-static void decodePercentEscape(String &src, String *dst) {
-    const char *arg = src.c_str();
-    if (dst) *dst = String();
-    while (*arg) {
-      char newch;
-      if (*arg == '+') newch = ' ';
-      else if (*arg == '%') {
-        arg++;
-        if (*arg >= '0' && *arg <= '9') newch = (*arg-'0') << 4;
-        if (*arg >= 'a' && *arg <= 'f') newch = (*arg-'a'+10) << 4;
-        if (*arg >= 'A' && *arg <= 'F') newch = (*arg-'A'+10) << 4;
-        arg++;
-        if (*arg == 0) break;
-        if (*arg >= '0' && *arg <= '9') newch |= (*arg-'0');
-        if (*arg >= 'a' && *arg <= 'f') newch |= (*arg-'a'+10);
-        if (*arg >= 'A' && *arg <= 'F') newch |= (*arg-'A'+10);
-      } else {
-        newch = *arg;
-      }
-      if (dst) {
-        *dst += newch;
-      } else {
-#ifdef WITH_LCD
-        lcd.print(newch);
-        x++;
-        if (x >= LCD_WIDTH) {
-          x = 0;
-          y++;
-          if (y >= LCD_HEIGHT) y = 0;
-          lcd.setCursor(x, y);
-        }
-#endif
-      }
-      arg++;
-    }
-}
 
 //
 // Boilerplate for iotsa server, with hooks to our code added.
