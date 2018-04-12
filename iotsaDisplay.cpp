@@ -22,14 +22,11 @@ void IotsaDisplayMod::setup() {
   delay(200);
   lcd.noBacklight();
   lcd.clear();
-#ifdef PIN_ALARM
-  pinMode(PIN_ALARM, INPUT); // Trick: we configure to input so we make the pin go Hi-Z.
-#endif
+  if (pin_alarm) {
+    pinMode(pin_alarm, INPUT); // Trick: we configure to input so we make the pin go Hi-Z.
+  }
   IFDEBUG IotsaSerial.println(" done");
 }
-
-int x=0;
-int y=0;
 
 void IotsaDisplayMod::handler() {
   String msg;
@@ -79,24 +76,24 @@ void IotsaDisplayMod::handler() {
         any = true;
       }
     }
-#ifdef PIN_ALARM
-    if (server.argName(i) == "alarm") {
-      const char *arg = server.arg(i).c_str();
-      if (arg && *arg) {
-        int dur = atoi(server.arg(i).c_str());
-//        IFDEBUG IotsaSerial.print("arg alarm=");
-//        IFDEBUG IotsaSerial.println(dur);
-        if (dur) {
-          alarmEndTime = millis() + dur*100;
-          IotsaSerial.println("alarm on");
-          pinMode(PIN_ALARM, OUTPUT);
-          digitalWrite(PIN_ALARM, LOW);
-        } else {
-          alarmEndTime = 0;
+    if (pin_alarm >= 0) {
+      if (server.argName(i) == "alarm") {
+        const char *arg = server.arg(i).c_str();
+        if (arg && *arg) {
+          int dur = atoi(server.arg(i).c_str());
+  //        IFDEBUG IotsaSerial.print("arg alarm=");
+  //        IFDEBUG IotsaSerial.println(dur);
+          if (dur) {
+            alarmEndTime = millis() + dur*100;
+            IotsaSerial.println("alarm on");
+            pinMode(pin_alarm, OUTPUT);
+            digitalWrite(pin_alarm, LOW);
+          } else {
+            alarmEndTime = 0;
+          }
         }
       }
     }
-#endif
   }
   if (any) {
       lcd.setCursor(x, y);
@@ -118,9 +115,9 @@ void IotsaDisplayMod::handler() {
   message += "Position X: <input name='x' value=''> Y: <input name='y' value=''><br>\n";
   message += "<input name='clear' type='checkbox' value='1'>Clear<br>\n";
   message += "Backlight: <input name='backlight' value=''> seconds<br>\n";
-#ifdef PIN_ALARM
-  message += "Alarm: <input name='alarm' value=''> (times 0.1 second)<br>\n";
-#endif
+  if (pin_alarm >= 0) {
+    message += "Alarm: <input name='alarm' value=''> (times 0.1 second)<br>\n";
+  }
   message += "<input type='submit'></form></body></html>";
   server.send(200, "text/html", message);
   
@@ -140,17 +137,17 @@ bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, 
     lcd.setCursor(x, y);
     any = true;
   }
-#ifdef PIN_ALARM
-  int alarm = reqObj.get<int>("alarm");
-  if (alarm) {
-    any = true;
-    alarmEndTime = millis() + alarm*100;
-    IotsaSerial.println("alarm on");
-    pinMode(PIN_ALARM, OUTPUT);
-    digitalWrite(PIN_ALARM, LOW);
-    
+  if (pin_alarm >= 0) {
+    int alarm = reqObj.get<int>("alarm");
+    if (alarm) {
+      any = true;
+      alarmEndTime = millis() + alarm*100;
+      IotsaSerial.println("alarm on");
+      pinMode(pin_alarm, OUTPUT);
+      digitalWrite(pin_alarm, LOW);
+      
+    }
   }
-#endif // PIN_ALARM
   int backlight = 5000;
   if (reqObj.containsKey("backlight")) {
     backlight = int(reqObj.get<float>("backlight") * 1000);
@@ -178,13 +175,11 @@ void IotsaDisplayMod::loop() {
     clearTime = 0;
     lcd.noBacklight();
   }
-#ifdef PIN_ALARM
-  if (alarmEndTime && millis() > alarmEndTime) {
+  if (pin_alarm >= 0 && alarmEndTime && millis() > alarmEndTime) {
     alarmEndTime = 0;
     IotsaSerial.println("alarm off");
-    pinMode(PIN_ALARM, INPUT);
+    pinMode(pin_alarm, INPUT);
   }
-#endif
 }
 
 void IotsaDisplayMod::serverSetup() {

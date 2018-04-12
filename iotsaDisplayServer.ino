@@ -25,7 +25,7 @@
 #include <ESP8266HTTPClient.h>
 #endif
 #define WITH_OTA // Define if you have an ESP12E or other board with enough Flash memory to allow OTA updates
-#define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (undefine for no buzzer)
+#define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (-1 for no buzzer)
 #define WITH_LCD       // Enable support for LCD, undefine to disable
 #define LCD_WIDTH 20  // Number of characters per line on LCD
 #define LCD_HEIGHT 4  // Number of lines on LCD
@@ -51,19 +51,12 @@ IotsaFilesBackupMod filesBackupMod(application);  // we want backup to clone the
 
 
 //
-// Buzzer configuration and implementation
-//
-#ifdef PIN_ALARM
-unsigned long alarmEndTime;
-#endif
-
-//
 // LCD configuration and implementation
 //
 #ifdef WITH_LCD
 // Includes and defines for liquid crystal server
 #include "iotsaDisplay.h"
-IotsaDisplayMod displayMod(application, PIN_SDA, PIN_SCL, LCD_WIDTH, LCD_HEIGHT);
+IotsaDisplayMod displayMod(application, PIN_SDA, PIN_SCL, LCD_WIDTH, LCD_HEIGHT, PIN_ALARM);
 #endif // WITH_LCD
 
 //
@@ -294,11 +287,7 @@ bool sendRequest(String urlStr, String token, String credentials, String sslInfo
     IFDEBUG IotsaSerial.print(code);
     IFDEBUG IotsaSerial.print(" OK GET ");
     IFDEBUG IotsaSerial.println(urlStr);
- #ifdef PIN_ALARM
-    alarmEndTime = millis() + BUTTON_BEEP_DUR;
-    pinMode(PIN_ALARM, OUTPUT);
-    digitalWrite(PIN_ALARM, LOW);
-#endif // PIN_ALARM
+    // xxxjack should call beep
   } else {
     IFDEBUG IotsaSerial.print(code);
     IFDEBUG IotsaSerial.print(" FAIL GET ");
