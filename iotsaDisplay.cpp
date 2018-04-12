@@ -22,9 +22,6 @@ void IotsaDisplayMod::setup() {
   delay(200);
   lcd.noBacklight();
   lcd.clear();
-  if (pin_alarm) {
-    pinMode(pin_alarm, INPUT); // Trick: we configure to input so we make the pin go Hi-Z.
-  }
   IFDEBUG IotsaSerial.println(" done");
 }
 
@@ -76,21 +73,12 @@ void IotsaDisplayMod::handler() {
         any = true;
       }
     }
-    if (pin_alarm >= 0) {
+    if (buzzer) {
       if (server.argName(i) == "alarm") {
         const char *arg = server.arg(i).c_str();
         if (arg && *arg) {
           int dur = atoi(server.arg(i).c_str());
-  //        IFDEBUG IotsaSerial.print("arg alarm=");
-  //        IFDEBUG IotsaSerial.println(dur);
-          if (dur) {
-            alarmEndTime = millis() + dur*100;
-            IotsaSerial.println("alarm on");
-            pinMode(pin_alarm, OUTPUT);
-            digitalWrite(pin_alarm, LOW);
-          } else {
-            alarmEndTime = 0;
-          }
+          buzzer->set(dur);
         }
       }
     }
@@ -115,7 +103,7 @@ void IotsaDisplayMod::handler() {
   message += "Position X: <input name='x' value=''> Y: <input name='y' value=''><br>\n";
   message += "<input name='clear' type='checkbox' value='1'>Clear<br>\n";
   message += "Backlight: <input name='backlight' value=''> seconds<br>\n";
-  if (pin_alarm >= 0) {
+  if (buzzer) {
     message += "Alarm: <input name='alarm' value=''> (times 0.1 second)<br>\n";
   }
   message += "<input type='submit'></form></body></html>";
@@ -137,15 +125,11 @@ bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, 
     lcd.setCursor(x, y);
     any = true;
   }
-  if (pin_alarm >= 0) {
+  if (buzzer) {
     int alarm = reqObj.get<int>("alarm");
     if (alarm) {
       any = true;
-      alarmEndTime = millis() + alarm*100;
-      IotsaSerial.println("alarm on");
-      pinMode(pin_alarm, OUTPUT);
-      digitalWrite(pin_alarm, LOW);
-      
+      buzzer->set(alarm);      
     }
   }
   int backlight = 5000;
@@ -174,11 +158,6 @@ void IotsaDisplayMod::loop() {
   if (clearTime && millis() > clearTime) {
     clearTime = 0;
     lcd.noBacklight();
-  }
-  if (pin_alarm >= 0 && alarmEndTime && millis() > alarmEndTime) {
-    alarmEndTime = 0;
-    IotsaSerial.println("alarm off");
-    pinMode(pin_alarm, INPUT);
   }
 }
 

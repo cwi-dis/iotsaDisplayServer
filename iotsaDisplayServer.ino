@@ -24,12 +24,7 @@
 #include <ESP8266HTTPClient.h>
 #endif
 #define WITH_OTA // Define if you have an ESP12E or other board with enough Flash memory to allow OTA updates
-#define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (-1 for no buzzer)
 #define WITH_LCD       // Enable support for LCD, undefine to disable
-#define LCD_WIDTH 20  // Number of characters per line on LCD
-#define LCD_HEIGHT 4  // Number of lines on LCD
-#define PIN_SDA 5
-#define PIN_SCL 4
 #define WITH_BUTTONS  // Enable support for buttons, undefine to disable
 #define PIN_BUTTON_1 13
 #define PIN_BUTTON_2 12
@@ -48,12 +43,26 @@ IotsaOtaMod otaMod(application);    // we want OTA for updating the software (wi
 
 
 //
-// LCD configuration and implementation
+// Configuration and implementation
 //
+#include "iotsaBuzzer.h"
+#ifdef WITH_BUZZER
+#define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (-1 for no buzzer)
+IotsaBuzzerMod buzzerMod(application, PIN_ALARM);
+IotsaBuzzerInterface *buzzer = &buzzerMod;
+#else
+IotsaBuzzerInterface *buzzer = NULL;
+#endif // WITH_BUZZER
+
 #ifdef WITH_LCD
 // Includes and defines for liquid crystal server
 #include "iotsaDisplay.h"
-IotsaDisplayMod displayMod(application, PIN_SDA, PIN_SCL, LCD_WIDTH, LCD_HEIGHT, PIN_ALARM);
+#define LCD_WIDTH 20  // Number of characters per line on LCD
+#define LCD_HEIGHT 4  // Number of lines on LCD
+#define PIN_SDA 5
+#define PIN_SCL 4
+
+IotsaDisplayMod displayMod(application, PIN_SDA, PIN_SCL, LCD_WIDTH, LCD_HEIGHT, buzzer);
 #endif // WITH_LCD
 
 //

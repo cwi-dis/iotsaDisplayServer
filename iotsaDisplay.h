@@ -2,19 +2,19 @@
 #define _IOTSADISPLAY_H_
 #include "iotsa.h"
 #include "iotsaApi.h"
+#include "iotsaBuzzer.h"
 
 class IotsaDisplayMod : IotsaApiMod {
 public:
-  IotsaDisplayMod(IotsaApplication &_app, int _pin_sda, int _pin_scl, int _lcd_width, int _lcd_height, int _pin_alarm=-1)
+  IotsaDisplayMod(IotsaApplication &_app, int _pin_sda, int _pin_scl, int _lcd_width, int _lcd_height, IotsaBuzzerInterface *_buzzer=NULL)
   : IotsaApiMod(_app),
     pin_sda(_pin_sda),
     pin_scl(_pin_scl),
     lcd_width(_lcd_width),
     lcd_height(_lcd_height),
-    pin_alarm(_pin_alarm),
+    buzzer(_buzzer),
     x(0),
-    y(0),
-    alarmEndTime(0)
+    y(0)
   {}
   void setup();
   void serverSetup();
@@ -31,9 +31,8 @@ private:
   int pin_scl;
   int lcd_width;
   int lcd_height;
-  int pin_alarm;
+  IotsaBuzzerInterface *buzzer;
   int x;
   int y;
-  unsigned long alarmEndTime;
 };
 #endif // _IOTSADISPLAY_H_
