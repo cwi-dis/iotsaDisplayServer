@@ -3,9 +3,16 @@
 #include "iotsa.h"
 #include "iotsaApi.h"
 #include "iotsaBuzzer.h"
+#include "iotsaConfigFile.h"
 
-typedef struct _Request {
-  _Request() : url(""), sslInfo(""), credentials(""), token("") {}
+class IotsaRequest {
+public:
+  IotsaRequest() : url(""), sslInfo(""), credentials(""), token("") {}
+  bool send();
+  void configLoad(IotsaConfigFileLoad& cf, String& name);
+  void configSave(IotsaConfigFileSave& cf, String& name);
+  void formHandler(String& message, String& text, String& name);
+  
   String url;
   String sslInfo;
   String credentials;
@@ -17,7 +24,7 @@ typedef struct _Button {
   int debounceState;
   int debounceTime;
   bool buttonState;
-  _Request req;
+  IotsaRequest req;
 } Button;
 
 
