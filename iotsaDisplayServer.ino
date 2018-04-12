@@ -15,7 +15,6 @@
 #include "iotsa.h"
 #include "iotsaWifi.h"
 #include "iotsaOta.h"
-#include "iotsaFilesBackup.h"
 #include "iotsaSimple.h"
 #include "iotsaConfigFile.h"
 #include "iotsaApi.h"
@@ -46,8 +45,6 @@ IotsaWifiMod wifiMod(application);  // wifi is always needed
 #ifdef WITH_OTA
 IotsaOtaMod otaMod(application);    // we want OTA for updating the software (will not work with esp-201)
 #endif
-
-IotsaFilesBackupMod filesBackupMod(application);  // we want backup to clone the display server
 
 
 //
