@@ -12,20 +12,22 @@ public:
   void configLoad(IotsaConfigFileLoad& cf, String& name);
   void configSave(IotsaConfigFileSave& cf, String& name);
   void formHandler(String& message, String& text, String& name);
-  
+  bool formArgHandler(IotsaWebServer &server, String name);
   String url;
   String sslInfo;
   String credentials;
   String token;
 };
 
-typedef struct _Button {
+class Button {
+public:
+  Button(int _pin) : pin(_pin) {}
   int pin;
   int debounceState;
   int debounceTime;
   bool buttonState;
   IotsaRequest req;
-} Button;
+};
 
 
 class IotsaButtonMod : IotsaApiMod {

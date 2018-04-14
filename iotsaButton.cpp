@@ -104,46 +104,50 @@ void IotsaRequest::formHandler(String& message, String& text, String& name) {
     message += "'><br>\n";
 }
 
+bool IotsaRequest::formArgHandler(IotsaWebServer &server, String name) {
+  bool any = false;
+  String wtdName = name + "url";
+  if (server.hasArg(wtdName)) {
+    decodePercentEscape(server.arg(wtdName), url);
+    IFDEBUG IotsaSerial.print(wtdName);
+    IFDEBUG IotsaSerial.print("=");
+    IFDEBUG IotsaSerial.println(url);
+    any = true;
+  }
+  wtdName = name + "SSL_INFO_NAME";
+  if (server.hasArg(wtdName)) {
+    decodePercentEscape(server.arg(wtdName), sslInfo);
+    IFDEBUG IotsaSerial.print(wtdName);
+    IFDEBUG IotsaSerial.print("=");
+    IFDEBUG IotsaSerial.println(sslInfo);
+    any = true;
+  }
+  wtdName = name + "credentials";
+  if (server.hasArg(wtdName)) {
+    decodePercentEscape(server.arg(wtdName), credentials);
+    IFDEBUG IotsaSerial.print(wtdName);
+    IFDEBUG IotsaSerial.print("=");
+    IFDEBUG IotsaSerial.println(credentials);
+    any = true;
+    }
+  wtdName = name + "token";
+  if (server.hasArg(wtdName)) {
+    decodePercentEscape(server.arg(wtdName), token);
+    IFDEBUG IotsaSerial.print(wtdName);
+    IFDEBUG IotsaSerial.print("=");
+    IFDEBUG IotsaSerial.println(token);
+    any = true;
+  }
+  return any;
+}
+
 void IotsaButtonMod::handler() {
   bool any = false;
 
   for (uint8_t i=0; i<server.args(); i++){
     for (int j=0; j<nButton; j++) {
-      String wtdName = "button" + String(j+1) + "url";
-      if (server.argName(i) == wtdName) {
-        String arg = server.arg(i);
-        decodePercentEscape(arg, buttons[j].req.url);
-        IFDEBUG IotsaSerial.print(wtdName);
-        IFDEBUG IotsaSerial.print("=");
-        IFDEBUG IotsaSerial.println(buttons[j].req.url);
-        any = true;
-      }
-      wtdName = "button" + String(j+1) + SSL_INFO_NAME;
-      if (server.argName(i) == wtdName) {
-        String arg = server.arg(i);
-        decodePercentEscape(arg, buttons[j].req.sslInfo);
-        IFDEBUG IotsaSerial.print(wtdName);
-        IFDEBUG IotsaSerial.print("=");
-        IFDEBUG IotsaSerial.println(buttons[j].req.sslInfo);
-        any = true;
-      }
-      wtdName = "button" + String(j+1) + "credentials";
-      if (server.argName(i) == wtdName) {
-        String arg = server.arg(i);
-        decodePercentEscape(arg, buttons[j].req.credentials);
-        IFDEBUG IotsaSerial.print(wtdName);
-        IFDEBUG IotsaSerial.print("=");
-        IFDEBUG IotsaSerial.println(buttons[j].req.credentials);
-        any = true;
-      }
-      wtdName = "button" + String(j+1) + "token";
-      if (server.argName(i) == wtdName) {
-        String arg = server.arg(i);
-        decodePercentEscape(arg, buttons[j].req.token);
-        IFDEBUG IotsaSerial.print(wtdName);
-        IFDEBUG IotsaSerial.print("=");
-        IFDEBUG IotsaSerial.println(buttons[j].req.token);
-        any = true;
+      if (buttons[j].req.formArgHandler(server, "button" + String(j+1))) {
+          any = true;
       }
     }
   }

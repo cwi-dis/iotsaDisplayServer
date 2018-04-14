@@ -63,8 +63,8 @@ IotsaDisplayMod displayMod(application, PIN_SDA, PIN_SCL, LCD_WIDTH, LCD_HEIGHT,
 #define PIN_BUTTON_2 12
 
 Button buttons[] = {
-  { PIN_BUTTON_1, 0, 0, false},
-  { PIN_BUTTON_2, 0, 0, false}
+  Button(PIN_BUTTON_1),
+  Button(PIN_BUTTON_2)
 };
 
 const int nButton = sizeof(buttons) / sizeof(buttons[0]);
