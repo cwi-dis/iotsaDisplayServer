@@ -1,4 +1,5 @@
 #include "iotsaRequest.h"
+#include <base64.h>
 #ifdef ESP32
 #include <HTTPClient.h>
 #else
@@ -133,10 +134,10 @@ bool IotsaRequest::send() {
   }
 
   if (credentials != "") {
-#if 1
+#if 0
     IotsaSerial.print("Credentials not yet implemented");
 #else
-  	String cred64 = b64encode(credentials);
+  	String cred64 = base64::encode(credentials);
     http.addHeader("Authorization", "Basic " + cred64);
 #endif
   }
