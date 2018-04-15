@@ -189,4 +189,5 @@ bool IotsaRequest::putHandler(const JsonVariant& request) {
     any = true;
     token = reqObj.get<String>("token");
   }
+  return any;
 }

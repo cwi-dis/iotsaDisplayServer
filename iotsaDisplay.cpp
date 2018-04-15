@@ -135,11 +135,14 @@ bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, 
   int backlight = 5000;
   if (reqObj.containsKey("backlight")) {
     backlight = int(reqObj.get<float>("backlight") * 1000);
+    any = true;
   }
   if (backlight) {
     clearTime = millis() + backlight;
+    IFDEBUG IotsaSerial.println("backlight");
     lcd.backlight();
   } else {
+    IFDEBUG IotsaSerial.println("nobacklight");
     lcd.noBacklight();
   }
   String msg = reqObj.get<String>("msg");
@@ -151,12 +154,13 @@ bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, 
 }
 
 String IotsaDisplayMod::info() {
-  return "<p>See <a href='/display'>/display</a> to display messages.";
+  return "<p>See <a href='/display'>/display</a> to display messages or <a href='/api/display'>/api/display</a> for REST interface.</p>";
 }
 
 void IotsaDisplayMod::loop() {
   if (clearTime && millis() > clearTime) {
     clearTime = 0;
+    IFDEBUG IotsaSerial.println("nobacklight");
     lcd.noBacklight();
   }
 }

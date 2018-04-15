@@ -2,7 +2,7 @@
 #include "iotsaConfigFile.h"
 
 #define DEBOUNCE_DELAY 50 // 50 ms debouncing
-#define BUTTON_BEEP_DUR 10  // 10ms beep for button press
+#define BUTTON_BEEP_DUR 1  // 100ms beep for button press
 
 void IotsaButtonMod::configLoad() {
   IotsaConfigFileLoad cf("/config/buttons.cfg");
@@ -55,7 +55,7 @@ void IotsaButtonMod::handler() {
 }
 
 String IotsaButtonMod::info() {
-  return "<p>See <a href='/buttons'>/buttons</a> to program URLs for button presses.</a>";
+  return "<p>See <a href='/buttons'>/buttons</a> to program URLs for button presses, <a href='/api/buttons'>/api/buttons</a> for REST interface..</a>";
 }
 
 void IotsaButtonMod::loop() {
@@ -80,17 +80,27 @@ void IotsaButtonMod::loop() {
 }
 
 bool IotsaButtonMod::getHandler(const char *path, JsonObject& reply) {
-  JsonArray& rv = reply.createNestedArray("buttons");
-  for (Button *b=buttons; b<buttons+nButton; b++) {
-    JsonObject& bRv = rv.createNestedObject();
-    b->req.getHandler(bRv);
-    bRv["state"] = b->buttonState;
+  if (strcmp(path, "/api/buttons") == 0) {
+    JsonArray& rv = reply.createNestedArray("buttons");
+    for (Button *b=buttons; b<buttons+nButton; b++) {
+        JsonObject& bRv = rv.createNestedObject();
+        b->req.getHandler(bRv);
+        bRv["state"] = b->buttonState;
+    }
+  } else {
+      String num(path);
+      num.remove(0, 13);
+      int idx = num.toInt();
+      Button *b = buttons + idx;
+      b->req.getHandler(reply);
+      reply["state"] = b->buttonState;
   }
   return true;
 }
 
 bool IotsaButtonMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
   bool any = false;
+  IotsaSerial.print("xxxjack put path "); IotsaSerial.println(path);
   if (strcmp(path, "/api/buttons") == 0) {
       if (!request.is<JsonArray>()) return false;
       const JsonArray& all = request.as<JsonArray>();
@@ -102,7 +112,8 @@ bool IotsaButtonMod::putHandler(const char *path, const JsonVariant& request, Js
       }
   } else {
       String num(path);
-      num.remove(0, 12);
+      num.remove(0, 13);
+      IotsaSerial.print("xxxjack num "); IotsaSerial.println(num);
       int idx = num.toInt();
       Button *b = buttons + idx;
       if (b->req.putHandler(request)) {
@@ -115,9 +126,10 @@ bool IotsaButtonMod::putHandler(const char *path, const JsonVariant& request, Js
 
 void IotsaButtonMod::serverSetup() {
   server.on("/buttons", std::bind(&IotsaButtonMod::handler, this));
-  api.setup("/api/buttons", true, false);
+  api.setup("/api/buttons", true, true);
   for(int i=0; i<nButton; i++) {
-      String *p = new String("/api/buttons" + String(i));
+      String *p = new String("/api/buttons/" + String(i));
+      IotsaSerial.print("xxxjack serverSetup "); IotsaSerial.println(*p);
       api.setup(p->c_str(), true, true);
   }
   name = "buttons";
