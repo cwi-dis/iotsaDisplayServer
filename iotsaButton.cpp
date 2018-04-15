@@ -240,46 +240,64 @@ void IotsaButtonMod::loop() {
   }
 }
 
+void IotsaRequest::getHandler(JsonObject& reply) {
+  reply["url"] = url;
+  reply[SSL_INFO_NAME] = sslInfo;
+  reply["hasCredentials"] = credentials != "";
+  reply["hasToken"] = token != "";
+}
+
 bool IotsaButtonMod::getHandler(const char *path, JsonObject& reply) {
   JsonArray& rv = reply.createNestedArray("buttons");
   for (Button *b=buttons; b<buttons+nButton; b++) {
     JsonObject& bRv = rv.createNestedObject();
-    bRv["url"] = b->req.url;
-    bRv[SSL_INFO_NAME] = b->req.sslInfo;
+    b->req.getHandler(bRv);
     bRv["state"] = b->buttonState;
-    bRv["hasCredentials"] = b->req.credentials != "";
-    bRv["hasToken"] = b->req.token != "";
   }
   return true;
 }
 
-bool IotsaButtonMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
-  Button *b;
-  if (strcmp(path, "/api/buttons/0") == 0) {
-    b = &buttons[0];
-  } else if (strcmp(path, "/api/buttons/1") == 0) {
-    b = &buttons[1];
-  } else {
-    return false;
-  }
+bool IotsaRequest::putHandler(const JsonVariant& request) {
   if (!request.is<JsonObject>()) return false;
-  JsonObject& reqObj = request.as<JsonObject>();
   bool any = false;
+  const JsonObject& reqObj = request.as<JsonObject>();
   if (reqObj.containsKey("url")) {
     any = true;
-    b->req.url = reqObj.get<String>("url");
+    url = reqObj.get<String>("url");
   }
   if (reqObj.containsKey(SSL_INFO_NAME)) {
     any = true;
-    b->req.sslInfo = reqObj.get<String>(SSL_INFO_NAME);
+    sslInfo = reqObj.get<String>(SSL_INFO_NAME);
   }
   if (reqObj.containsKey("credentials")) {
     any = true;
-    b->req.credentials = reqObj.get<String>("credentials");
+    credentials = reqObj.get<String>("credentials");
   }
   if (reqObj.containsKey("token")) {
     any = true;
-    b->req.token = reqObj.get<String>("token");
+    token = reqObj.get<String>("token");
+  }
+}
+
+bool IotsaButtonMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+  bool any = false;
+  if (strcmp(path, "/api/buttons") == 0) {
+      if (!request.is<JsonArray>()) return false;
+      const JsonArray& all = request.as<JsonArray>();
+      for (int i=0; i<nButton; i++) {
+          const JsonVariant& r = all[i];
+          if (buttons[i].req.putHandler(r)) {
+              any = true;
+          }
+      }
+  } else {
+      String num(path);
+      num.remove(0, 12);
+      int idx = num.toInt();
+      Button *b = buttons + idx;
+      if (b->req.putHandler(request)) {
+        any = true;
+      }
   }
   if (any) configSave();
   return any;
@@ -288,7 +306,9 @@ bool IotsaButtonMod::putHandler(const char *path, const JsonVariant& request, Js
 void IotsaButtonMod::serverSetup() {
   server.on("/buttons", std::bind(&IotsaButtonMod::handler, this));
   api.setup("/api/buttons", true, false);
-  api.setup("/api/buttons/0", false, true);
-  api.setup("/api/buttons/1", false, true);
+  for(int i=0; i<nButton; i++) {
+      String *p = new String("/api/buttons" + String(i));
+      api.setup(p->c_str(), true, true);
+  }
   name = "buttons";
 }

@@ -13,6 +13,8 @@ public:
   void configSave(IotsaConfigFileSave& cf, String& name);
   void formHandler(String& message, String& text, String& name);
   bool formArgHandler(IotsaWebServer &server, String name);
+  void getHandler(JsonObject& reply);
+  bool putHandler(const JsonVariant& request);
   String url;
   String sslInfo;
   String credentials;
