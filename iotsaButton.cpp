@@ -2,7 +2,6 @@
 #include "iotsaConfigFile.h"
 
 #define DEBOUNCE_DELAY 50 // 50 ms debouncing
-#define BUTTON_BEEP_DUR 10  // 10ms beep for button press
 
 void IotsaButtonMod::configLoad() {
   IotsaConfigFileLoad cf("/config/buttons.cfg");
@@ -136,9 +135,11 @@ void IotsaButtonMod::loop() {
         buttons[i].buttonState = newButtonState;
         bool doSend = (buttons[i].buttonState && buttons[i].sendOnPress) || (!buttons[i].buttonState && buttons[i].sendOnRelease);
         if (doSend && buttons[i].req.url != "") {
-            if (buttons[i].req.send()) {
-                if (buzzer) buzzer->set(BUTTON_BEEP_DUR);
-            }
+          if (buttons[i].req.send()) {
+            if (successCallback) successCallback();
+          } else {
+            if (failureCallback) failureCallback();
+          }
         }
       }
     }

@@ -32,7 +32,12 @@ IotsaOtaMod otaMod(application);    // we want OTA for updating the software (wi
 #include "iotsaBuzzer.h"
 #define PIN_ALARM 14  // GPIO14 is pin  to which buzzer is connected (-1 for no buzzer)
 IotsaBuzzerMod buzzerMod(application, PIN_ALARM);
+#if 1
 IotsaBuzzerInterface *buzzer = &buzzerMod;
+#else
+#define buzzer ((IotsaBuzzerInterface *)0)
+#endif
+#define BUTTON_BEEP_DUR 10  // 10ms beep for button press
 
 //
 // LCD section. Removve if you don't want LCD support.
@@ -59,7 +64,7 @@ Button buttons[] = {
 };
 const int nButton = sizeof(buttons) / sizeof(buttons[0]);
 
-IotsaButtonMod buttonMod(application, buttons, nButton, buzzer);
+IotsaButtonMod buttonMod(application, buttons, nButton);
 
 //
 // Boilerplate for iotsa server, with hooks to our code added.
@@ -67,6 +72,9 @@ IotsaButtonMod buttonMod(application, buttons, nButton, buzzer);
 void setup(void) {
   application.setup();
   application.serverSetup();
+  if (buzzer) {
+    buttonMod.successCallback = std::bind(&IotsaBuzzerInterface::set, buzzer, BUTTON_BEEP_DUR);
+  }
 #ifndef ESP32
   ESP.wdtEnable(WDTO_120MS);
 #endif

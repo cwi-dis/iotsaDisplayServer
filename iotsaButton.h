@@ -2,8 +2,8 @@
 #define _IOTSABUTTON_H_
 #include "iotsa.h"
 #include "iotsaApi.h"
-#include "iotsaBuzzer.h"
 #include "iotsaRequest.h"
+#include <functional>
 
 class Button {
 public:
@@ -17,13 +17,16 @@ public:
   IotsaRequest req;
 };
 
+typedef std::function<void(void)> callback;
+
 class IotsaButtonMod : IotsaApiMod {
 public:
-  IotsaButtonMod(IotsaApplication &_app, Button* _buttons, int _nButton, IotsaBuzzerInterface *_buzzer=NULL)
+  IotsaButtonMod(IotsaApplication &_app, Button* _buttons, int _nButton, callback _successCallback=NULL, callback _failureCallback=NULL)
   : IotsaApiMod(_app),
     buttons(_buttons),
     nButton(_nButton),
-    buzzer(_buzzer)
+    successCallback(_successCallback),
+    failureCallback(_failureCallback)
   {}
   void setup();
   void serverSetup();
@@ -37,7 +40,9 @@ protected:
   void handler();
   Button* buttons;
   int nButton;
-  IotsaBuzzerInterface *buzzer;
+public:
+  callback successCallback;
+  callback failureCallback;
 };
 
 #endif // _IOTSABUTTON_H_
