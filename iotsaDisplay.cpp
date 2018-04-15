@@ -78,7 +78,7 @@ void IotsaDisplayMod::handler() {
         const char *arg = server.arg(i).c_str();
         if (arg && *arg) {
           int dur = atoi(server.arg(i).c_str());
-          buzzer->set(dur);
+          buzzer->set(dur*100);
         }
       }
     }
@@ -129,7 +129,7 @@ bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, 
     int alarm = reqObj.get<int>("alarm");
     if (alarm) {
       any = true;
-      buzzer->set(alarm);      
+      buzzer->set(alarm*100);      
     }
   }
   int backlight = 5000;

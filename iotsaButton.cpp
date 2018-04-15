@@ -2,7 +2,7 @@
 #include "iotsaConfigFile.h"
 
 #define DEBOUNCE_DELAY 50 // 50 ms debouncing
-#define BUTTON_BEEP_DUR 1  // 100ms beep for button press
+#define BUTTON_BEEP_DUR 10  // 10ms beep for button press
 
 void IotsaButtonMod::configLoad() {
   IotsaConfigFileLoad cf("/config/buttons.cfg");

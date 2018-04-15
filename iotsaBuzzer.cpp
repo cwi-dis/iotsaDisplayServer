@@ -6,7 +6,7 @@ void IotsaBuzzerMod::setup() {
 
 void IotsaBuzzerMod::set(int dur) {
   if (dur) {
-    alarmEndTime = millis() + dur*100;
+    alarmEndTime = millis() + dur;
     IotsaSerial.println("alarm on");
     pinMode(pin, OUTPUT);
     digitalWrite(pin, LOW);
