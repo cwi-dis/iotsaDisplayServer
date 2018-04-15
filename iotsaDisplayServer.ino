@@ -63,8 +63,9 @@ Button buttons[] = {
   Button(PIN_BUTTON_2, true, false)
 };
 const int nButton = sizeof(buttons) / sizeof(buttons[0]);
+callback buttonOk = std::bind(&IotsaBuzzerInterface::set, buzzer, BUTTON_BEEP_DUR);
 
-IotsaButtonMod buttonMod(application, buttons, nButton);
+IotsaButtonMod buttonMod(application, buttons, nButton, buttonOk);
 
 //
 // Boilerplate for iotsa server, with hooks to our code added.
@@ -72,9 +73,6 @@ IotsaButtonMod buttonMod(application, buttons, nButton);
 void setup(void) {
   application.setup();
   application.serverSetup();
-  if (buzzer) {
-    buttonMod.successCallback = std::bind(&IotsaBuzzerInterface::set, buzzer, BUTTON_BEEP_DUR);
-  }
 #ifndef ESP32
   ESP.wdtEnable(WDTO_120MS);
 #endif
