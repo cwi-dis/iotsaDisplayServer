@@ -7,8 +7,10 @@
 
 class Button {
 public:
-  Button(int _pin) : pin(_pin) {}
+  Button(int _pin, bool _sendOnPress, bool _sendOnRelease) : pin(_pin), sendOnPress(_sendOnPress), sendOnRelease(_sendOnRelease) {}
   int pin;
+  bool sendOnPress;
+  bool sendOnRelease;
   int debounceState;
   int debounceTime;
   bool buttonState;

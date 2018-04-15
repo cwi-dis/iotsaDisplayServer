@@ -9,6 +9,24 @@ void IotsaButtonMod::configLoad() {
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1);
     buttons[i].req.configLoad(cf, name);
+    name = name + "on";
+    String sendOn;
+    cf.get(name, sendOn, "");
+    if (sendOn == "press") {
+      buttons[i].sendOnPress = true;
+      buttons[i].sendOnRelease = false;
+    } else
+    if (sendOn == "release") {
+      buttons[i].sendOnPress = false;
+      buttons[i].sendOnRelease = true;
+    } else
+    if (sendOn == "change") {
+      buttons[i].sendOnPress = true;
+      buttons[i].sendOnRelease = true;
+    } else {
+      buttons[i].sendOnPress = false;
+      buttons[i].sendOnRelease = false;
+    }
   }
 }
 
@@ -17,6 +35,20 @@ void IotsaButtonMod::configSave() {
   for (int i=0; i<nButton; i++) {
     String name = "button" + String(i+1);
     buttons[i].req.configSave(cf, name);
+    name = name + "on";
+    if (buttons[i].sendOnPress) {
+      if (buttons[i].sendOnRelease) {
+        cf.put(name, "change");
+      } else {
+        cf.put(name, "press");
+      }
+    } else {
+      if (buttons[i].sendOnRelease) {
+        cf.put(name, "release");
+      } else {
+        cf.put(name, "none");
+      }
+    }
   }
 }
 
@@ -35,6 +67,24 @@ void IotsaButtonMod::handler() {
       if (buttons[j].req.formArgHandler(server, "button" + String(j+1))) {
           any = true;
       }
+      String wtdName = "button" + String(j+1) + "on";
+      if (server.hasArg(wtdName)) {
+        String arg = server.arg(wtdName);
+        if (arg == "press") {
+          buttons[j].sendOnPress = true;
+          buttons[j].sendOnRelease = false;
+        } else if (arg == "release") {
+          buttons[j].sendOnPress = false;
+          buttons[j].sendOnRelease = true;
+        } else if (arg == "change") {
+          buttons[j].sendOnPress = true;
+          buttons[j].sendOnRelease = true;
+        } else {
+          buttons[j].sendOnPress = false;
+          buttons[j].sendOnRelease = false;
+        }
+        any = true;
+      }
     }
   }
   if (any) configSave();
@@ -48,7 +98,22 @@ void IotsaButtonMod::handler() {
   message += "<form method='get'>";
   for (int i=0; i<nButton; i++) {
     buttons[i].req.formHandler(message, "Button " + String(i+1), "button" + String(i+1));
-
+    message += "Call URL on: ";
+    message += "<input name='button" + String(i+1) + "on' type='radio' value='press'";
+    if (buttons[i].sendOnPress && !buttons[i].sendOnRelease) message += " checked";
+    message += "> Press ";
+    
+    message += "<input name='button" + String(i+1) + "on' type='radio' value='release'";
+    if (!buttons[i].sendOnPress && buttons[i].sendOnRelease) message += " checked";
+    message += "> Release ";
+    
+    message += "<input name='button" + String(i+1) + "on' type='radio' value='change'";
+    if (buttons[i].sendOnPress && buttons[i].sendOnRelease) message += " checked";
+    message += "> Press and release ";
+    
+    message += "<input name='button" + String(i+1) + "on' type='radio' value='none'";
+    if (!buttons[i].sendOnPress && !buttons[i].sendOnRelease) message += " checked";
+    message += "> Never<br>\n";
   }
   message += "<input type='submit'></form></body></html>";
   server.send(200, "text/html", message);
@@ -69,7 +134,8 @@ void IotsaButtonMod::loop() {
       int newButtonState = (state == LOW);
       if (newButtonState != buttons[i].buttonState) {
         buttons[i].buttonState = newButtonState;
-        if (buttons[i].buttonState && buttons[i].req.url != "") {
+        bool doSend = (buttons[i].buttonState && buttons[i].sendOnPress) || (!buttons[i].buttonState && buttons[i].sendOnRelease);
+        if (doSend && buttons[i].req.url != "") {
             if (buttons[i].req.send()) {
                 if (buzzer) buzzer->set(BUTTON_BEEP_DUR);
             }
@@ -86,6 +152,8 @@ bool IotsaButtonMod::getHandler(const char *path, JsonObject& reply) {
         JsonObject& bRv = rv.createNestedObject();
         b->req.getHandler(bRv);
         bRv["state"] = b->buttonState;
+        bRv["onPress"] = b->sendOnPress;
+        bRv["onRelease"] = b->sendOnRelease;
     }
   } else {
       String num(path);
@@ -94,31 +162,51 @@ bool IotsaButtonMod::getHandler(const char *path, JsonObject& reply) {
       Button *b = buttons + idx;
       b->req.getHandler(reply);
       reply["state"] = b->buttonState;
+      reply["onPress"] = b->sendOnPress;
+      reply["onRelease"] = b->sendOnRelease;
   }
   return true;
 }
 
 bool IotsaButtonMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
   bool any = false;
-  IotsaSerial.print("xxxjack put path "); IotsaSerial.println(path);
   if (strcmp(path, "/api/buttons") == 0) {
-      if (!request.is<JsonArray>()) return false;
-      const JsonArray& all = request.as<JsonArray>();
+      if (!request.is<JsonArray>()) {
+        return false;
+      }
+      const JsonArray& all = request.as<JsonArray&>();
       for (int i=0; i<nButton; i++) {
           const JsonVariant& r = all[i];
           if (buttons[i].req.putHandler(r)) {
               any = true;
           }
+          const JsonObject& reqObj = r.as<JsonObject&>();
+          if (reqObj.containsKey("onPress")) {
+            any = true;
+            buttons[i].sendOnPress = reqObj.get<bool>("onPress");
+          }
+          if (reqObj.containsKey("onRelease")) {
+            any = true;
+            buttons[i].sendOnRelease = reqObj.get<bool>("onRelease");
+          }          
       }
   } else {
       String num(path);
       num.remove(0, 13);
-      IotsaSerial.print("xxxjack num "); IotsaSerial.println(num);
       int idx = num.toInt();
       Button *b = buttons + idx;
       if (b->req.putHandler(request)) {
         any = true;
       }
+      const JsonObject& reqObj = request.as<JsonObject&>();
+      if (reqObj.containsKey("onPress")) {
+        any = true;
+        buttons[idx].sendOnPress = reqObj.get<bool>("onPress");
+      }
+      if (reqObj.containsKey("onRelease")) {
+        any = true;
+        buttons[idx].sendOnRelease = reqObj.get<bool>("onRelease");
+      }          
   }
   if (any) configSave();
   return any;
@@ -129,7 +217,6 @@ void IotsaButtonMod::serverSetup() {
   api.setup("/api/buttons", true, true);
   for(int i=0; i<nButton; i++) {
       String *p = new String("/api/buttons/" + String(i));
-      IotsaSerial.print("xxxjack serverSetup "); IotsaSerial.println(*p);
       api.setup(p->c_str(), true, true);
   }
   name = "buttons";
