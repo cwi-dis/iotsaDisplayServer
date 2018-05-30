@@ -35,6 +35,11 @@ About half way down the file you specify the GPIO pins to which buttons have bee
 
 Compile, and flash either using an FTDI or (if your esp board supports it) over-the-air.
 
+It is also possible to build variants of this service by specifying _iotsa_ build flags:
+
+- `-DIOTSA_WITHOUT_HTTP -DIOTSA_WITH_HTTPS` builds a version that uses https (for securing your display)
+- `-DIOTSA_WITHOUT_HTTP -DIOTSA_WITHOUT_REST -DIOTSA_WITH_COAP` builds a version with no web interface and no REST interface. In stead, the API is exposed over UDP using the COAP protocol. This could be used for an low-power version if you have a suitable low power display.
+
 ## Operation
 
 The first time the board boots it creates a Wifi network with a name similar to _config-iotsa1234_.  Connect a device to that network and visit <http://192.168.4.1>. Configure your device name (using the name _lcd_ is suggested), WiFi name and password, and after reboot the iotsa board should connect to your network and be visible as <http://lcd.local>.
