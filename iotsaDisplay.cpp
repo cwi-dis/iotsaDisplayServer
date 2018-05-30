@@ -31,55 +31,51 @@ void IotsaDisplayMod::handler() {
   bool didBacklight = false;
   bool didPos = false;
 
-  for (uint8_t i=0; i<server->args(); i++){
-    if( server->argName(i) == "msg") {
-      msg = server->arg(i);
+  if( server->hasArg("msg")) {
+    msg = server->arg("msg");
+    any = true;
+  }
+  if( server->hasArg("clear")) {
+    if (atoi(server->arg("clear").c_str()) > 0) {
+      lcd.clear();
+      if (!didPos) x = y = 0;
+    }
+    any = true;
+  }
+  if( server->hasArg("x")) {
+    const char *arg = server->arg("x").c_str();
+    if (arg && *arg) {
+      didPos = true;
+      x = atoi(arg);
+    }
+  }
+  if( server->hasArg("y")) {
+    const char *arg = server->arg("y").c_str();
+    if (arg && *arg) {
+      didPos = true;
+      y = atoi(arg);
+    }
+  }
+  if (server->hasArg("backlight")) {
+    const char *arg = server->arg("backlight").c_str();
+    if (arg && *arg) {
+      int dur = atoi(arg);
+      any = true;
+      didBacklight = true;
+      if (dur) {
+        clearTime = millis() + dur*1000;
+      } else {
+        clearTime = 0;
+      }
       any = true;
     }
-    if( server->argName(i) == "clear") {
-      if (atoi(server->arg(i).c_str()) > 0) {
-        lcd.clear();
-        if (!didPos) x = y = 0;
-      }
-      any = true;
-    }
-    if( server->argName(i) == "x") {
-      const char *arg = server->arg(i).c_str();
+  }
+  if (buzzer) {
+    if (server->hasArg("alarm")) {
+      const char *arg = server->arg("alarm").c_str();
       if (arg && *arg) {
-        didPos = true;
-        x = atoi(server->arg(i).c_str());
-      }
-    }
-    if( server->argName(i) == "y") {
-      const char *arg = server->arg(i).c_str();
-      if (arg && *arg) {
-        didPos = true;
-        y = atoi(server->arg(i).c_str());
-      }
-    }
-    if (server->argName(i) == "backlight") {
-      const char *arg = server->arg(i).c_str();
-      if (arg && *arg) {
-        int dur = atoi(server->arg(i).c_str());
-//        IFDEBUG IotsaSerial.print("arg backlight=");
-//        IFDEBUG IotsaSerial.println(dur);
-        any = true;
-        didBacklight = true;
-        if (dur) {
-          clearTime = millis() + dur*1000;
-        } else {
-          clearTime = 0;
-        }
-        any = true;
-      }
-    }
-    if (buzzer) {
-      if (server->argName(i) == "alarm") {
-        const char *arg = server->arg(i).c_str();
-        if (arg && *arg) {
-          int dur = atoi(server->arg(i).c_str());
-          buzzer->set(dur*100);
-        }
+        int dur = atoi(arg);
+        buzzer->set(dur*100);
       }
     }
   }
@@ -204,7 +200,7 @@ void IotsaDisplayMod::printPercentEscape(String &src) {
 
 void IotsaDisplayMod::printString(String &src) {
   if (src != "") {
-    for (int i=0; i<src.length(); i++) {
+    for (size_t i=0; i<src.length(); i++) {
       char newch = src.charAt(i);
       lcd.print(newch);
       x++;
