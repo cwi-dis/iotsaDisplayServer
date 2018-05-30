@@ -18,7 +18,7 @@ void IotsaDisplayMod::setup() {
   Wire.begin(pin_sda, pin_scl);
   lcd.begin(lcd_width, lcd_height);
   lcd.backlight();
-  lcd.print(hostName);
+  lcd.print(iotsaConfig.hostName);
   delay(200);
   lcd.noBacklight();
   lcd.clear();
@@ -31,36 +31,36 @@ void IotsaDisplayMod::handler() {
   bool didBacklight = false;
   bool didPos = false;
 
-  for (uint8_t i=0; i<server.args(); i++){
-    if( server.argName(i) == "msg") {
-      msg = server.arg(i);
+  for (uint8_t i=0; i<server->args(); i++){
+    if( server->argName(i) == "msg") {
+      msg = server->arg(i);
       any = true;
     }
-    if( server.argName(i) == "clear") {
-      if (atoi(server.arg(i).c_str()) > 0) {
+    if( server->argName(i) == "clear") {
+      if (atoi(server->arg(i).c_str()) > 0) {
         lcd.clear();
         if (!didPos) x = y = 0;
       }
       any = true;
     }
-    if( server.argName(i) == "x") {
-      const char *arg = server.arg(i).c_str();
+    if( server->argName(i) == "x") {
+      const char *arg = server->arg(i).c_str();
       if (arg && *arg) {
         didPos = true;
-        x = atoi(server.arg(i).c_str());
+        x = atoi(server->arg(i).c_str());
       }
     }
-    if( server.argName(i) == "y") {
-      const char *arg = server.arg(i).c_str();
+    if( server->argName(i) == "y") {
+      const char *arg = server->arg(i).c_str();
       if (arg && *arg) {
         didPos = true;
-        y = atoi(server.arg(i).c_str());
+        y = atoi(server->arg(i).c_str());
       }
     }
-    if (server.argName(i) == "backlight") {
-      const char *arg = server.arg(i).c_str();
+    if (server->argName(i) == "backlight") {
+      const char *arg = server->arg(i).c_str();
       if (arg && *arg) {
-        int dur = atoi(server.arg(i).c_str());
+        int dur = atoi(server->arg(i).c_str());
 //        IFDEBUG IotsaSerial.print("arg backlight=");
 //        IFDEBUG IotsaSerial.println(dur);
         any = true;
@@ -74,10 +74,10 @@ void IotsaDisplayMod::handler() {
       }
     }
     if (buzzer) {
-      if (server.argName(i) == "alarm") {
-        const char *arg = server.arg(i).c_str();
+      if (server->argName(i) == "alarm") {
+        const char *arg = server->arg(i).c_str();
         if (arg && *arg) {
-          int dur = atoi(server.arg(i).c_str());
+          int dur = atoi(server->arg(i).c_str());
           buzzer->set(dur*100);
         }
       }
@@ -107,7 +107,7 @@ void IotsaDisplayMod::handler() {
     message += "Alarm: <input name='alarm' value=''> (times 0.1 second)<br>\n";
   }
   message += "<input type='submit'></form></body></html>";
-  server.send(200, "text/html", message);
+  server->send(200, "text/html", message);
   
 }
 
@@ -166,8 +166,9 @@ void IotsaDisplayMod::loop() {
 }
 
 void IotsaDisplayMod::serverSetup() {
-  server.on("/display", std::bind(&IotsaDisplayMod::handler, this));
+  server->on("/display", std::bind(&IotsaDisplayMod::handler, this));
   api.setup("/api/display", false, false, true);
+  name = "display";
 }
 
 

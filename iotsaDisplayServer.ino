@@ -18,8 +18,7 @@
 #include "iotsaSimple.h"
 #include "iotsaApi.h"
 
-IotsaWebServer server(80);
-IotsaApplication application(server, "LCD Display Server");
+IotsaApplication application("LCD Display Server");
 
 // Configure modules we need
 IotsaWifiMod wifiMod(application);  // wifi is always needed
