@@ -117,19 +117,19 @@ String IotsaDisplayMod::info() {
 bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
   bool any = false;
   if (!request.is<JsonObject>()) return false;
-  JsonObject& reqObj = request.as<JsonObject>();
-  if (reqObj.get<bool>("clear")) {
+  JsonObject reqObj = request.as<JsonObject>();
+  if (reqObj["clear"].as<bool>()) {
     any = true;
     lcd.clear();
   }
   if (reqObj.containsKey("x") || reqObj.containsKey("y")) {
-    x = reqObj.get<int>("x");
-    y = reqObj.get<int>("y");
+    x = reqObj["x"];
+    y = reqObj["y"];
     lcd.setCursor(x, y);
     any = true;
   }
   if (buzzer) {
-    int alarm = reqObj.get<int>("alarm");
+    int alarm = reqObj["alarm"];
     if (alarm) {
       any = true;
       buzzer->set(alarm*100);      
@@ -137,7 +137,7 @@ bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, 
   }
   int backlight = 5000;
   if (reqObj.containsKey("backlight")) {
-    backlight = int(reqObj.get<float>("backlight") * 1000);
+    backlight = int(reqObj["backlight"].as<float>() * 1000);
     any = true;
   }
   if (backlight) {
@@ -148,7 +148,7 @@ bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, 
     IFDEBUG IotsaSerial.println("nobacklight");
     lcd.noBacklight();
   }
-  String msg = reqObj.get<String>("msg");
+  String msg = reqObj["msg"].as<String>();
   if (msg != "") {
       printString(msg);
       any = true;
