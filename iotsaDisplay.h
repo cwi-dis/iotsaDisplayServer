@@ -23,6 +23,7 @@ public:
   void alarm(int ms);
 protected:
   bool postHandler(const char *path, const JsonVariant& request, JsonObject& reply);
+  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply);
 private:
   void handler();
   void printPercentEscape(String &src);

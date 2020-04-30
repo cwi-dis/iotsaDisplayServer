@@ -115,6 +115,10 @@ String IotsaDisplayMod::info() {
 
 #ifdef IOTSA_WITH_API
 bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+  return putHandler(path, request, reply);
+}
+
+bool IotsaDisplayMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
   bool any = false;
   if (!request.is<JsonObject>()) return false;
   JsonObject reqObj = request.as<JsonObject>();
@@ -170,7 +174,7 @@ void IotsaDisplayMod::serverSetup() {
   server->on("/display", std::bind(&IotsaDisplayMod::handler, this));
 #endif
 #ifdef IOTSA_WITH_API
-  api.setup("/api/display", false, false, true);
+  api.setup("/api/display", false, true, true);
   name = "display";
 #endif
 }
