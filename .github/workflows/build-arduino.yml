@@ -48,11 +48,17 @@ jobs:
           path: CustomLibrary_iotsa
           ref: ${{ env.iotsa_ref }}
       
-    - name: Install constom libraries
+    - name: Install constom library ArduinoJWT
       uses: actions/checkout@v2
       with:
           repository: yutter/ArduinoJWT
           path: CustomLibrary_ArduinoJWT
+      
+    - name: Install constom library New-LibquidCrystal
+      uses: actions/checkout@v2
+      with:
+          repository: fmalpartida/New-LiquidCrystal
+          path: CustomLibrary_New_LiquidCrystal
       
     - name: Arduino build
       uses: ArminJo/arduino-test-compile@v3
