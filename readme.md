@@ -9,7 +9,7 @@ This software is licensed under the [MIT license](LICENSE.txt) by the   CWI DIS 
 
 * Arduino IDE, v1.6 or later.
 * The iotsa framework, download from <https://github.com/cwi-dis/iotsa>.
-* The new LiquidCrystal library, download from <https://bitbucket.org/fmalpartida/new-liquidcrystal>.
+* The new LiquidCrystal library, download from <https://github.com/fmalpartida/New-LiquidCrystal.
 
 ## Hardware requirements
 
