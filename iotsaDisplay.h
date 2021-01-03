@@ -16,14 +16,14 @@ public:
     x(0),
     y(0)
   {}
-  void setup();
-  void serverSetup();
-  void loop();
-  String info();
+  void setup() override;
+  void serverSetup() override;
+  void loop() override;
+  String info() override;
   void alarm(int ms);
 protected:
-  bool postHandler(const char *path, const JsonVariant& request, JsonObject& reply);
-  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply);
+  bool postHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
+  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
 private:
   void handler();
   void printPercentEscape(String &src);

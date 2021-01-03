@@ -11,10 +11,10 @@ public:
 class IotsaBuzzerMod : public IotsaApiMod, public IotsaBuzzerInterface {
 public:
   IotsaBuzzerMod(IotsaApplication &_app, int _pin) : IotsaApiMod(_app), pin(_pin), alarmEndTime(0) {};
-  virtual void setup();
-  virtual void serverSetup() {};
-  virtual void loop();
-  virtual String info() { return ""; };
+  virtual void setup() override;
+  virtual void serverSetup() override {};
+  virtual void loop() override;
+  virtual String info() override { return ""; };
   virtual void set(int duration);
   virtual int get();
 protected:
