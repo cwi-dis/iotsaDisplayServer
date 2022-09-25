@@ -1,5 +1,8 @@
 # iotsaDisplayServer - web server to drive an LCD display
 
+![build-platformio](https://github.com/cwi-dis/iotsaDisplayServer/workflows/build-platformio/badge.svg)
+![build-arduino](https://github.com/cwi-dis/iotsaDisplayServer/workflows/build-arduino/badge.svg)
+
 iotsaDisplayServer is a web server that drives an LCD display, such as an i2c 4x20 character module. Support for a buzzer (to attract user attention) and buttons (programmable to trigger actions by accessing programmable URLs) is included.
 
 Home page is <https://github.com/cwi-dis/iotsaDisplayServer>.
