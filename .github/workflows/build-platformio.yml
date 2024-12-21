@@ -26,16 +26,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        board:
-        - nodemcuv2
-        - esp32thing
-        variant: [""]
-        build_flags: [""]
-        board_build_flags: [""]
-        pio_extra_args: [""]
         include:
-          - board: esp32thing
-            pio_extra_args: --project-option="board_build.partitions=min_spiffs.csv"
+        - board: nodemcuv2
+          variant: [""]
+          build_flags: [""]
+          board_build_flags: [""]
+          pio_extra_args: [""]
+        - board: esp32thing
+          variant: [""]
+          build_flags: [""]
+          board_build_flags: [""]
+          pio_extra_args: --project-option="board_build.partitions=min_spiffs.csv"
   
     steps:
     - name: Set env
@@ -84,7 +85,7 @@ jobs:
 
     - name: Run PlatformIO
       run: |
-        pio run --environment ${{ matrix.board }}
+        pio run --environment ${{ matrix.board }}  ${{ matrix.pio_extra_args }}
       env:
         PLATFORMIO_BUILD_FLAGS: ${{ matrix.build_flags }} ${{ matrix.board_build_flags }}
         IOTSA_CONFIG_PROGRAM_NAME: ${{ env.this_product }}-${{ matrix.variant }}${{ matrix.board }}
