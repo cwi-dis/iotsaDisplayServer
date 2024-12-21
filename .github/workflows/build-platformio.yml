@@ -33,7 +33,10 @@ jobs:
         build_flags: [""]
         board_build_flags: [""]
         pio_extra_args: [""]
-
+        include:
+          - board: esp32thing
+            pio_extra_args: --project-option="board_build.partitions=min_spiffs.csv"
+  
     steps:
     - name: Set env
       run: |
