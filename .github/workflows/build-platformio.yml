@@ -26,18 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-        - board: nodemcuv2
-          variant: [""]
-          build_flags: [""]
-          board_build_flags: [""]
-          pio_extra_args: [""]
-        - board: esp32thing
-          variant: [""]
-          build_flags: [""]
-          board_build_flags: [""]
-          pio_extra_args: --project-option="board_build.partitions=min_spiffs.csv"
-  
+        board:
+        - nodemcuv2
+        - esp32thing
+
     steps:
     - name: Set env
       run: |
@@ -85,13 +77,10 @@ jobs:
 
     - name: Run PlatformIO
       run: |
-        pio run --environment ${{ matrix.board }}  ${{ matrix.pio_extra_args }}
-      env:
-        PLATFORMIO_BUILD_FLAGS: ${{ matrix.build_flags }} ${{ matrix.board_build_flags }}
-        IOTSA_CONFIG_PROGRAM_NAME: ${{ env.this_product }}-${{ matrix.variant }}${{ matrix.board }}
-        
+        pio run --environment ${{ matrix.board }}
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.this_product }}--${{ matrix.variant }}${{ matrix.board }}.bin
+        name: ${{ env.this_product }}-${{ matrix.board }}-${{ env.iotsa_ref }}.bin
         path: .pio/build/${{ matrix.board }}/firmware.bin
