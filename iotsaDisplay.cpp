@@ -126,34 +126,33 @@ bool IotsaDisplayMod::putHandler(const char *path, const JsonVariant& request, J
     any = true;
     lcd.clear();
   }
-  if (reqObj.containsKey("x") || reqObj.containsKey("y")) {
+  if (getFromRequest<int>(reqObj, "x", x) || getFromRequest<int>(reqObj, "y", y)) {
     x = reqObj["x"];
     y = reqObj["y"];
     lcd.setCursor(x, y);
     any = true;
   }
   if (buzzer) {
-    int alarm = reqObj["alarm"];
-    if (alarm) {
+    int alarm = 0;
+    if (getFromRequest<int>(reqObj, "alarm", alarm)) {
       any = true;
       buzzer->set(alarm*100);      
     }
   }
-  int backlight = 5000;
-  if (reqObj.containsKey("backlight")) {
-    backlight = int(reqObj["backlight"].as<float>() * 1000);
+  float backlight = 5;
+  if (getFromRequest<float>(reqObj, "backlight", backlight)) {
     any = true;
   }
   if (backlight) {
-    clearTime = millis() + backlight;
+    clearTime = millis() + (int)(backlight*1000);
     IFDEBUG IotsaSerial.println("backlight");
     lcd.backlight();
   } else {
     IFDEBUG IotsaSerial.println("nobacklight");
     lcd.noBacklight();
   }
-  String msg = reqObj["msg"].as<String>();
-  if (msg != "") {
+  String msg;
+  if (getFromRequest<const char *>(reqObj, "msg", msg)) {
       printString(msg);
       any = true;
   }
@@ -183,7 +182,7 @@ void IotsaDisplayMod::serverSetup() {
 void IotsaDisplayMod::printPercentEscape(String &src) {
     const char *arg = src.c_str();
     while (*arg) {
-      char newch;
+      char newch = 0;
       if (*arg == '+') newch = ' ';
       else if (*arg == '%') {
         arg++;
