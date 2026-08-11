@@ -122,13 +122,14 @@ bool IotsaDisplayMod::putHandler(const char *path, const JsonVariant& request, J
   bool any = false;
   if (!request.is<JsonObject>()) return false;
   JsonObject reqObj = request.as<JsonObject>();
-  if (reqObj["clear"].as<bool>()) {
+  bool clear = false;
+  if (getFromRequest<bool, bool>(reqObj, "clear", clear) && clear) {
     any = true;
     lcd.clear();
   }
-  if (getFromRequest<int>(reqObj, "x", x) || getFromRequest<int>(reqObj, "y", y)) {
-    x = reqObj["x"];
-    y = reqObj["y"];
+  bool changedX = getFromRequest<int>(reqObj, "x", x);
+  bool changedY = getFromRequest<int>(reqObj, "y", y);
+  if (changedX || changedY) {
     lcd.setCursor(x, y);
     any = true;
   }
