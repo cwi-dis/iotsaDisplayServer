@@ -1,22 +1,22 @@
 #ifndef _IOTSABUZZER_H_
 #define _IOTSABUZZER_H_
 #include "iotsa.h"
-#include "iotsaApi.h"
 
 class IotsaBuzzerInterface {
 public:
   virtual void set(int duration) = 0;
 };
 
-class IotsaBuzzerMod : public IotsaApiMod, public IotsaBuzzerInterface {
+// No REST/web surface of its own -- driven only through IotsaBuzzerInterface by
+// other modules (display, buttons). Hence IotsaBaseModule, not IotsaModule.
+class IotsaBuzzerMod : public IotsaBaseModule, public IotsaBuzzerInterface {
 public:
-  IotsaBuzzerMod(IotsaApplication &_app, int _pin) : IotsaApiMod(_app), pin(_pin), alarmEndTime(0) {};
-  virtual void setup() override;
-  virtual void serverSetup() override {};
-  virtual void loop() override;
-  virtual String info() override { return ""; };
-  virtual void set(int duration);
-  virtual int get();
+  IotsaBuzzerMod(IotsaApplication &_app, int _pin) : IotsaBaseModule(_app), pin(_pin), alarmEndTime(0) {};
+  void setup() override;
+  void loop() override;
+  String info() override { return ""; };
+  void set(int duration) override;
+  int get();
 protected:
   int pin;
   unsigned long alarmEndTime;

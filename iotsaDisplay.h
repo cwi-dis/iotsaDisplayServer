@@ -4,10 +4,10 @@
 #include "iotsaApi.h"
 #include "iotsaBuzzer.h"
 
-class IotsaDisplayMod : IotsaApiMod {
+class IotsaDisplayMod : public IotsaModule {
 public:
   IotsaDisplayMod(IotsaApplication &_app, int _pin_sda, int _pin_scl, int _lcd_width, int _lcd_height, IotsaBuzzerInterface *_buzzer=NULL)
-  : IotsaApiMod(_app),
+  : IotsaModule(_app),
     pin_sda(_pin_sda),
     pin_scl(_pin_scl),
     lcd_width(_lcd_width),
@@ -17,15 +17,14 @@ public:
     y(0)
   {}
   void setup() override;
-  void serverSetup() override;
+  void lateSetup() override;
   void loop() override;
   String info() override;
-  void alarm(int ms);
 protected:
   bool postHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
   bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
 private:
-  void handler();
+  void webHandler() override;
   void printPercentEscape(String &src);
   void printString(String &src);
   int pin_sda;

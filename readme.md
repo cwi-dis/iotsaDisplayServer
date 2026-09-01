@@ -10,33 +10,22 @@ This software is licensed under the [MIT license](LICENSE.txt) by the   CWI DIS 
 
 ## Software requirements
 
-* Arduino IDE, v1.6 or later.
-* The iotsa framework, download from <https://github.com/cwi-dis/iotsa>.
-* The new LiquidCrystal library, download from <https://github.com/fmalpartida/New-LiquidCrystal.
+* PlatformIO (recommended). `pio run` builds every environment in `platformio.ini`; the LiquidCrystal library is pulled in automatically.
+* Or the Arduino IDE, with the iotsa framework from <https://github.com/cwi-dis/iotsa> and the fmalpartida "New LiquidCrystal" library (<https://github.com/fmalpartida/New-LiquidCrystal>).
 
 ## Hardware requirements
 
-* an esp8266 board, such as an ESP-12, ESP-201 or iotsa board.
+* an ESP8266 board (ESP-12 / iotsa_v4; the original build used an ESP-201).
 * An i2c LCD module.
 * Optionally some pushbuttons and a buzzer.
 
 ## Hardware construction
 
-Instructions for constructing the hardware using an ESP-201 board are provided in the _extras_ subfolder:
-
-* [DisplayServer-schematic.pdf](extras/DisplayServer-schematic.pdf) has the schematics.
-* [DisplayServer-breadboard.pdf](extras/DisplayServer-breadboard.pdf) shows how to put the bits together on a breadboard. The [Fritzing](http://fritzing.org/home/) project is also available as [DisplayServer-bb.fzz](extras/DisplayServer-bb.fzz).
-* [DisplayServer-stripboard.pdf](extras/DisplayServer-stripboard.pdf) shows how to put the bits together on a stripboard. The [Fritzing](http://fritzing.org/home/) project is also available as [DisplayServer-bb.fzz](extras/DisplayServer-print.fzz).
+The _extras_ subfolder has the design files. `DisplayServer-schematic.pdf` / `-breadboard.pdf` / `-stripboard.pdf` (and the matching `.fzz` [Fritzing](http://fritzing.org/home/) projects) are the original ESP-201 build; `DisplayServerIotsa.fzz` / `.pdf` is the later iotsa-board version.
 
 ## Building the software
 
-You may need to modify the defines `PIN_ALARM`, `WITH_LCD` and `WITH_BUTTONS` near the top, to reflect which optional hardware support you want.
-
-A bit further down you specify the LCD parameters with `PIN_SDA`, `PIN_SCL`, `LCD_WIDTH` and `LCD_HEIGHT`. Depending on the specific LCD you use you may need to make changes in the following few lines.
-
-About half way down the file you specify the GPIO pins to which buttons have been connected, in the initializer of the `buttons` variable.
-
-Compile, and flash either using an FTDI or (if your esp board supports it) over-the-air.
+The pin assignments, LCD size and button GPIOs are `#define`s near the top of `mainDisplayServer.cpp` -- adjust them to your hardware. Compile and flash with `pio run -e nodemcuv2 -t upload`, or over-the-air once the device is on the network.
 
 It is also possible to build variants of this service by specifying _iotsa_ build flags:
 

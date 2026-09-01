@@ -12,7 +12,6 @@
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 unsigned long clearTime;  // time at which to turn off backlight
 
-#ifdef IOTSA_WITH_WEB
 // LCD handlers
 void IotsaDisplayMod::setup() {
   IFDEBUG IotsaSerial.print("lcdSetup");
@@ -26,7 +25,8 @@ void IotsaDisplayMod::setup() {
   IFDEBUG IotsaSerial.println(" done");
 }
 
-void IotsaDisplayMod::handler() {
+void IotsaDisplayMod::webHandler() {
+  IotsaWebServer *server = api.webService->server;
   String msg;
   bool any = false;
   bool didBacklight = false;
@@ -111,9 +111,7 @@ void IotsaDisplayMod::handler() {
 String IotsaDisplayMod::info() {
   return "<p>See <a href='/display'>/display</a> to display messages or <a href='/api/display'>/api/display</a> for REST interface.</p>";
 }
-#endif // IOTSA_WITH_WEB
 
-#ifdef IOTSA_WITH_API
 bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
   return putHandler(path, request, reply);
 }
@@ -159,7 +157,6 @@ bool IotsaDisplayMod::putHandler(const char *path, const JsonVariant& request, J
   }
   return any;
 }
-#endif // IOTSA_WITH_API
 
 void IotsaDisplayMod::loop() {
   if (clearTime && millis() > clearTime) {
@@ -169,14 +166,12 @@ void IotsaDisplayMod::loop() {
   }
 }
 
-void IotsaDisplayMod::serverSetup() {
-#ifdef IOTSA_WITH_WEB
-  server->on("/display", std::bind(&IotsaDisplayMod::handler, this));
-#endif
-#ifdef IOTSA_WITH_API
-  api.setup("/api/display", false, true, true);
+void IotsaDisplayMod::lateSetup() {
+  // get=false: GET /api/display is not meaningful (the display is write-only), so
+  // api.setup() registers no web page -- wire /display up on the shared server.
+  api.setup("display", false, true, true);
   name = "display";
-#endif
+  app.server->on("/display", std::bind(&IotsaDisplayMod::webHandler, this));
 }
 
 
