@@ -14,14 +14,10 @@
 
 #include <Esp.h>
 #include "iotsa.h"
-#include "iotsaWifi.h"
-#include "iotsaOta.h"
 
 IotsaApplication application("LCD Display Server");
 
 // Configure modules we need
-IotsaWifiMod wifiMod(application);  // wifi is always needed
-IotsaOtaMod otaMod(application);    // OTA firmware updates
 
 //
 // Buzzer section. Set `buzzer` to NULL if there is no buzzer.
