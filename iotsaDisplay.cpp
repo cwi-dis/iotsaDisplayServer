@@ -112,11 +112,11 @@ String IotsaDisplayMod::info() {
   return "<p>See <a href='/display'>/display</a> to display messages or <a href='/api/display'>/api/display</a> for REST interface.</p>";
 }
 
-bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
-  return putHandler(path, request, reply);
+bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed) {
+  return putHandler(path, request, reply, changed);
 }
 
-bool IotsaDisplayMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply) {
+bool IotsaDisplayMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed) {
   bool any = false;
   if (!request.is<JsonObject>()) return false;
   JsonObject reqObj = request.as<JsonObject>();
@@ -155,7 +155,8 @@ bool IotsaDisplayMod::putHandler(const char *path, const JsonVariant& request, J
       printString(msg);
       any = true;
   }
-  return any;
+  if ((any) && changed) *changed = true;
+  return true;
 }
 
 void IotsaDisplayMod::loop() {

@@ -21,8 +21,8 @@ public:
   void loop() override;
   String info() override;
 protected:
-  bool postHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
-  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply) override;
+  bool postHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed = nullptr) override;
+  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed = nullptr) override;
 private:
   void webHandler() override;
   void printPercentEscape(String &src);
