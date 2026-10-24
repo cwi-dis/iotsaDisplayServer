@@ -21,11 +21,16 @@ public:
   void loop() override;
   String info() override;
 protected:
-  bool postHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed = nullptr) override;
-  bool putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed = nullptr) override;
+  void getHandler(IotsaApiContext& ctx) override;
+  void putHandler(IotsaApiContext& ctx) override;
+  void postHandler(IotsaApiContext& ctx) override { putHandler(ctx); }
+#ifdef IOTSA_WITH_WEB
+  String webTitle() override { return "LCD Display"; }
+  void formHandler_args(IotsaWebContext& ctx) override;
+  void formHandler_fields(IotsaWebContext& ctx) override;
+#endif
 private:
-  void webHandler() override;
-  void printPercentEscape(String &src);
+  template<class Ctx> void _args(Ctx& ctx);
   void printString(String &src);
   int pin_sda;
   int pin_scl;

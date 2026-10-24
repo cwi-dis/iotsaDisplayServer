@@ -25,138 +25,93 @@ void IotsaDisplayMod::setup() {
   IFDEBUG IotsaSerial.println(" done");
 }
 
-void IotsaDisplayMod::webHandler() {
-  IotsaWebServer *server = api.webService->server;
-  String msg;
-  bool any = false;
-  bool didBacklight = false;
-  bool didPos = false;
-
-  if( server->hasArg("msg")) {
-    msg = server->arg("msg");
-    any = true;
-  }
-  if( server->hasArg("clear")) {
-    if (atoi(server->arg("clear").c_str()) > 0) {
-      lcd.clear();
-      if (!didPos) x = y = 0;
-    }
-    any = true;
-  }
-  if( server->hasArg("x")) {
-    const char *arg = server->arg("x").c_str();
-    if (arg && *arg) {
-      didPos = true;
-      x = atoi(arg);
-    }
-  }
-  if( server->hasArg("y")) {
-    const char *arg = server->arg("y").c_str();
-    if (arg && *arg) {
-      didPos = true;
-      y = atoi(arg);
-    }
-  }
-  if (server->hasArg("backlight")) {
-    const char *arg = server->arg("backlight").c_str();
-    if (arg && *arg) {
-      int dur = atoi(arg);
-      any = true;
-      didBacklight = true;
-      if (dur) {
-        clearTime = millis() + dur*1000;
-      } else {
-        clearTime = 0;
-      }
-      any = true;
-    }
-  }
-  if (buzzer) {
-    if (server->hasArg("alarm")) {
-      const char *arg = server->arg("alarm").c_str();
-      if (arg && *arg) {
-        int dur = atoi(arg);
-        buzzer->set(dur*100);
-      }
-    }
-  }
-  if (any) {
-      lcd.setCursor(x, y);
-//      IFDEBUG IotsaSerial.print("Show message ");
-//      IFDEBUG IotsaSerial.println(msg);
-      printPercentEscape(msg);
-      if (!didBacklight) 
-         clearTime = millis() + 5000; // 5 seconds is the default display time
-      if (clearTime) {
-        IFDEBUG IotsaSerial.println("backlight");
-        lcd.backlight();
-      } else {
-        IFDEBUG IotsaSerial.println("nobacklight");
-        lcd.noBacklight();
-      }
-  }
-  String message = "<html><head><title>LCD Server</title></head><body><h1>LCD Server</h1>";
-  message += "<form method='get'>Message: <input name='msg' value=''><br>\n";
-  message += "Position X: <input name='x' value=''> Y: <input name='y' value=''><br>\n";
-  message += "<input name='clear' type='checkbox' value='1'>Clear<br>\n";
-  message += "Backlight: <input name='backlight' value=''> seconds<br>\n";
-  if (buzzer) {
-    message += "Alarm: <input name='alarm' value=''> (times 0.1 second)<br>\n";
-  }
-  message += "<input type='submit'></form></body></html>";
-  server->send(200, "text/html", message);
-  
+// On the page an empty field means "not given": the cursor stays where it
+// is, the backlight gets its default. The API leaves the field out instead.
+#ifdef IOTSA_WITH_WEB
+static bool _empty(IotsaWebContext& ctx, const char *name) {
+  String value;
+  return ctx.argPeek(name, value) && value == "";
 }
+#endif
+static bool _empty(IotsaApiContext& ctx, const char *name) { return false; }
+
+// msg, x, y, clear, backlight (seconds, default 5, 0 is off) and alarm
+// (tenths of a second), the same on the page and in the API. Commands only:
+// nothing is saved, and everyone on the network may use them.
+template<class Ctx> void IotsaDisplayMod::_args(Ctx& ctx) {
+  String msg;
+  int newX = -1;
+  int newY = -1;
+  bool clear = false;
+  float backlight = -1;
+  int alarm = 0;
+  bool any = ctx.arg("msg", msg, IotsaContext::Transient);
+  bool pos = false;
+  if (!_empty(ctx, "x")) pos |= ctx.arg("x", newX, IotsaContext::Transient);
+  if (!_empty(ctx, "y")) pos |= ctx.arg("y", newY, IotsaContext::Transient);
+  any |= ctx.arg("clear", clear, IotsaContext::Transient);
+  bool light = !_empty(ctx, "backlight") && ctx.arg("backlight", backlight, IotsaContext::Transient);
+  if (buzzer && !_empty(ctx, "alarm")) any |= ctx.arg("alarm", alarm, IotsaContext::Transient);
+  if (pos && newX != -1 && (newX < 0 || newX >= lcd_width)) ctx.error(400, "x: 0 to " + String(lcd_width-1));
+  if (pos && newY != -1 && (newY < 0 || newY >= lcd_height)) ctx.error(400, "y: 0 to " + String(lcd_height-1));
+  if (light && backlight < 0) ctx.error(400, "backlight: seconds, 0 is off");
+  if (alarm < 0) ctx.error(400, "alarm: tenths of a second");
+  if (ctx.failed() || !(any || pos || light)) return;
+
+  if (clear) {
+    lcd.clear();
+    if (!pos) x = y = 0;
+  }
+  if (newX != -1) x = newX;
+  if (newY != -1) y = newY;
+  lcd.setCursor(x, y);
+  printString(msg);
+  if (alarm) buzzer->set(alarm*100);
+  if (!light) backlight = 5;
+  if (backlight > 0) {
+    clearTime = millis() + (unsigned long)(backlight*1000);
+    IFDEBUG IotsaSerial.println("backlight");
+    lcd.backlight();
+  } else {
+    clearTime = 0;
+    IFDEBUG IotsaSerial.println("nobacklight");
+    lcd.noBacklight();
+  }
+}
+
+#ifdef IOTSA_WITH_WEB
+void IotsaDisplayMod::formHandler_args(IotsaWebContext& ctx) {
+  _args(ctx);
+}
+
+void IotsaDisplayMod::formHandler_fields(IotsaWebContext& ctx) {
+  if (!ctx.includesEveryday()) return;
+  IotsaWebContext::Form form(ctx, "Show");
+  ctx.showField("Message", "msg", "", IotsaWebContext::Transient);
+  String where = "empty: where the cursor is (" + String(x) + "," + String(y) + ")";
+  ctx.showField("Position X", "x", "", IotsaWebContext::Transient, where.c_str());
+  ctx.showField("Position Y", "y", "", IotsaWebContext::Transient);
+  ctx.showCheckbox("Clear", "clear", false, IotsaWebContext::Transient, "also moves the cursor to 0,0, unless a position is given");
+  ctx.showField("Backlight (seconds)", "backlight", "", IotsaWebContext::Transient, "empty: 5, 0: off");
+  if (buzzer) ctx.showField("Alarm (tenths of a second)", "alarm", "", IotsaWebContext::Transient);
+}
+#endif // IOTSA_WITH_WEB
 
 String IotsaDisplayMod::info() {
   return "<p>See <a href='/display'>/display</a> to display messages or <a href='/api/display'>/api/display</a> for REST interface.</p>";
 }
 
-bool IotsaDisplayMod::postHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed) {
-  return putHandler(path, request, reply, changed);
+void IotsaDisplayMod::getHandler(IotsaApiContext& ctx) {
+  ctx.show("x", x);
+  ctx.show("y", y);
+  ctx.show("width", lcd_width);
+  ctx.show("height", lcd_height);
+  unsigned long now = millis();
+  ctx.show("backlight", clearTime > now ? (int)((clearTime - now + 999) / 1000) : 0);
 }
 
-bool IotsaDisplayMod::putHandler(const char *path, const JsonVariant& request, JsonObject& reply, bool *changed) {
-  bool any = false;
-  if (!request.is<JsonObject>()) return false;
-  JsonObject reqObj = request.as<JsonObject>();
-  bool clear = false;
-  if (getFromRequest<bool, bool>(reqObj, "clear", clear) && clear) {
-    any = true;
-    lcd.clear();
-  }
-  bool changedX = getFromRequest<int>(reqObj, "x", x);
-  bool changedY = getFromRequest<int>(reqObj, "y", y);
-  if (changedX || changedY) {
-    lcd.setCursor(x, y);
-    any = true;
-  }
-  if (buzzer) {
-    int alarm = 0;
-    if (getFromRequest<int>(reqObj, "alarm", alarm)) {
-      any = true;
-      buzzer->set(alarm*100);      
-    }
-  }
-  float backlight = 5;
-  if (getFromRequest<float>(reqObj, "backlight", backlight)) {
-    any = true;
-  }
-  if (backlight) {
-    clearTime = millis() + (int)(backlight*1000);
-    IFDEBUG IotsaSerial.println("backlight");
-    lcd.backlight();
-  } else {
-    IFDEBUG IotsaSerial.println("nobacklight");
-    lcd.noBacklight();
-  }
-  String msg;
-  if (getFromRequest<const char *>(reqObj, "msg", msg)) {
-      printString(msg);
-      any = true;
-  }
-  if ((any) && changed) *changed = true;
-  return true;
+void IotsaDisplayMod::putHandler(IotsaApiContext& ctx) {
+  _args(ctx);
 }
 
 void IotsaDisplayMod::loop() {
@@ -168,43 +123,11 @@ void IotsaDisplayMod::loop() {
 }
 
 void IotsaDisplayMod::lateSetup() {
-  // get=false: GET /api/display is not meaningful (the display is write-only), so
-  // api.setup() registers no web page -- wire /display up on the shared server.
-  api.setup("display", false, true, true);
+  // /display (the module's page) is registered by api.setup().
+  api.setup("display", true, true, true);
   name = "display";
-  app.server->on("/display", std::bind(&IotsaDisplayMod::webHandler, this));
 }
 
-
-void IotsaDisplayMod::printPercentEscape(String &src) {
-    const char *arg = src.c_str();
-    while (*arg) {
-      char newch = 0;
-      if (*arg == '+') newch = ' ';
-      else if (*arg == '%') {
-        arg++;
-        if (*arg >= '0' && *arg <= '9') newch = (*arg-'0') << 4;
-        if (*arg >= 'a' && *arg <= 'f') newch = (*arg-'a'+10) << 4;
-        if (*arg >= 'A' && *arg <= 'F') newch = (*arg-'A'+10) << 4;
-        arg++;
-        if (*arg == 0) break;
-        if (*arg >= '0' && *arg <= '9') newch |= (*arg-'0');
-        if (*arg >= 'a' && *arg <= 'f') newch |= (*arg-'a'+10);
-        if (*arg >= 'A' && *arg <= 'F') newch |= (*arg-'A'+10);
-      } else {
-        newch = *arg;
-      }
-      lcd.print(newch);
-      x++;
-      if (x >= lcd_width) {
-        x = 0;
-        y++;
-        if (y >= lcd_height) y = 0;
-        lcd.setCursor(x, y);
-      }
-      arg++;
-    }
-}
 
 void IotsaDisplayMod::printString(String &src) {
   if (src != "") {
