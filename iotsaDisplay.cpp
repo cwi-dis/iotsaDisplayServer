@@ -14,7 +14,7 @@ unsigned long clearTime;  // time at which to turn off backlight
 
 // LCD handlers
 void IotsaDisplayMod::setup() {
-  IFDEBUG IotsaSerial.print("lcdSetup");
+  IOTSA_LOG_DEBUG("display", "setup sda %d scl %d %dx%d", pin_sda, pin_scl, lcd_width, lcd_height);
   Wire.begin(pin_sda, pin_scl);
   lcd.begin(lcd_width, lcd_height);
   lcd.backlight();
@@ -22,7 +22,6 @@ void IotsaDisplayMod::setup() {
   delay(200);
   lcd.noBacklight();
   lcd.clear();
-  IFDEBUG IotsaSerial.println(" done");
 }
 
 // On the page an empty field means "not given": the cursor stays where it
@@ -70,11 +69,11 @@ template<class Ctx> void IotsaDisplayMod::_args(Ctx& ctx) {
   if (!light) backlight = 5;
   if (backlight > 0) {
     clearTime = millis() + (unsigned long)(backlight*1000);
-    IFDEBUG IotsaSerial.println("backlight");
+    IOTSA_LOG_DEBUG("display", "backlight on");
     lcd.backlight();
   } else {
     clearTime = 0;
-    IFDEBUG IotsaSerial.println("nobacklight");
+    IOTSA_LOG_DEBUG("display", "backlight off");
     lcd.noBacklight();
   }
 }
@@ -117,7 +116,7 @@ void IotsaDisplayMod::putHandler(IotsaApiContext& ctx) {
 void IotsaDisplayMod::loop() {
   if (clearTime && millis() > clearTime) {
     clearTime = 0;
-    IFDEBUG IotsaSerial.println("nobacklight");
+    IOTSA_LOG_DEBUG("display", "backlight off");
     lcd.noBacklight();
   }
 }
